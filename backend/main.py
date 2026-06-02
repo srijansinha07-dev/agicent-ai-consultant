@@ -24,7 +24,8 @@ from fastapi.middleware.cors import (
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
-    "https://pdf-assistant-langgraph.vercel.app",
+    "https://pdf-assistant-langgraph.vercel.app"
+    "https://agicent-ai-consultant.vercel.app",
 ]
 
 app.add_middleware(
