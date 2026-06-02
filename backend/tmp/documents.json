@@ -1,0 +1,17 @@
+{
+  "agicent_f923259c": {
+    "info": {
+      "doc_id": "agicent_f923259c",
+      "user_id": "website_bot",
+      "name": "Agicent Website",
+      "pages": 250,
+      "status": "ready",
+      "ocr_pages": 0,
+      "chunks": 4013,
+      "upload_time": "2026-06-01T10:47:53.607210+00:00",
+      "suggestions": []
+    },
+    "pdf_path": "website://agicent",
+    "suggestions": []
+  }
+}

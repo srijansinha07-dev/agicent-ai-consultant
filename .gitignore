@@ -1,0 +1,64 @@
+# =========================
+# FRONTEND
+# =========================
+
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# =========================
+# BACKEND
+# =========================
+
+backend/.env
+
+backend/__pycache__/
+backend/*.pyc
+
+# Python virtual envs
+backend/venv/
+backend/.venv/
+
+# =========================
+# CHROMA DATABASE
+# =========================
+
+backend/chroma_db/
+
+# =========================
+# RUNTIME DATA
+# =========================
+
+backend/data/consultations.json
+
+# =========================
+# DEBUG FILES
+# =========================
+
+backend/ocr_debug_page_*.png
+
+# =========================
+# OS FILES
+# =========================
+
+.DS_Store
+Thumbs.db
+
+# =========================
+# LOGS
+# =========================
+
+*.log
+
+# =========================
+# IDE
+# =========================
+
+.vscode/
+.idea/
+backend/data/crawled_pages.json
+backend/data/cleaned_pages.json

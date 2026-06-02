@@ -1,0 +1,38 @@
+{
+  "5c9891f9df40": {
+    "info": {
+      "doc_id": "5c9891f9df40",
+      "name": "OS_L28_13.03.26.pdf",
+      "pages": 9,
+      "status": "ready",
+      "ocr_pages": 3,
+      "chunks": 12,
+      "upload_time": "2026-05-26T11:17:01.864213+00:00",
+      "suggestions": [
+        "Explain the key concepts",
+        "Find important formulas",
+        "Summarize this chapter",
+        "Quiz me on this topic"
+      ]
+    },
+    "pdf_path": "C:\\Users\\srija\\Downloads\\pdf-assistant-langgraph (1)\\pdf-assistant\\backend\\uploads\\5c9891f9df40.pdf"
+  },
+  "bc36ea77ce77": {
+    "info": {
+      "doc_id": "bc36ea77ce77",
+      "name": "Drafting-Pleadings-and-Conveyancing.pdf",
+      "pages": 140,
+      "status": "ready",
+      "ocr_pages": 27,
+      "chunks": 357,
+      "upload_time": "2026-05-26T12:15:23.558853+00:00",
+      "suggestions": [
+        "Summarize this agreement",
+        "What are the important clauses?",
+        "What obligations are mentioned?",
+        "Explain the key terms"
+      ]
+    },
+    "pdf_path": "C:\\Users\\srija\\Downloads\\pdf-assistant-langgraph (1)\\pdf-assistant\\backend\\uploads\\bc36ea77ce77.pdf"
+  }
+}

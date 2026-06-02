@@ -1,0 +1,137 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+/* Agicent brand — aligned with agicent.com (navy, red, warm orange/yellow) */
+:root {
+  --agicent-navy: #2d2e45;
+  --agicent-red: #e23e30;
+  --agicent-orange: #f05a28;
+  --agicent-orange-light: #ff7a45;
+  --agicent-yellow: #fdb913;
+  --agicent-gradient: linear-gradient(135deg, #e23e30 0%, #f05a28 55%, #ff9a3c 100%);
+  --agicent-gradient-trigger: linear-gradient(145deg, #f05a28 0%, #fdb913 100%);
+
+  --bg: #ffffff;
+  --bg-2: #f8f7f5;
+  --bg-3: #f0eeeb;
+  --bg-4: #e8e5e1;
+  --border: rgba(45, 46, 69, 0.1);
+  --border-strong: rgba(45, 46, 69, 0.16);
+  --text: #2d2e45;
+  --text-2: #5c5d72;
+  --text-3: #8a8b9a;
+  --accent: #e23e30;
+  --accent-2: #f05a28;
+  --accent-dim: rgba(226, 62, 48, 0.08);
+  --accent-border: rgba(226, 62, 48, 0.22);
+  --user-bubble: #fdf2f0;
+  --assistant-bubble: #ffffff;
+  --header-text: #ffffff;
+  --shadow-lg: 0 20px 48px rgba(45, 46, 69, 0.18), 0 8px 16px rgba(45, 46, 69, 0.08);
+  --shadow-sm: 0 2px 12px rgba(45, 46, 69, 0.1);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --widget-width: 400px;
+  --widget-height: 580px;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+}
+
+/* Embed host: isolate widget from host page styles */
+#agicent-consultant-root,
+[data-agicent-consultant] {
+  font-family: var(--font);
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.chat-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse-dot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes expand-panel {
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-slide-up { animation: slideUp 0.22s ease-out; }
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
+.animate-expand { animation: expand-panel 0.22s ease-out; }
+
+textarea {
+  font-family: inherit;
+}
+
+[data-component='chat-widget'] {
+  position: relative;
+  z-index: 2147483000;
+  pointer-events: none;
+}
+
+[data-component='chat-widget'] > * {
+  pointer-events: auto;
+}
+
+/* Fullscreen consultant workspace */
+.consultant-workspace--expanded {
+  animation: workspace-enter 0.2s ease-out;
+}
+
+@keyframes workspace-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.consultant-workspace-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 20px;
+  min-height: 100%;
+}
+
+.consultant-workspace--expanded .consultant-workspace-footer {
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 20px;
+}
