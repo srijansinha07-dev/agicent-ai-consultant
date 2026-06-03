@@ -61,18 +61,15 @@ async def startup():
 
 # ── Routes ──────────────────────────────────────────────
 
+# ── Routes ──────────────────────────────────────────────
 @app.get("/")
 def root():
-    return {
-        "message": "server working"
-    }
+    return "OK"
 
 
 @app.get("/api/health")
 def health():
-    return {
-        "status": "ok"
-    }
+    return "OK"
 
 # ── Run ─────────────────────────────────────────────────
 
