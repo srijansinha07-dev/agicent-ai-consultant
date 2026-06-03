@@ -225,12 +225,9 @@ async def ingest_website_debug():
             }
         )
 
-    doc_id = (
-        "agicent_"
-        + str(
-            uuid.uuid4()
-        )[:8]
-    )
+    doc_id = "agicent_website"
+       
+  
 
     docstore.register(
         doc_id=doc_id,
