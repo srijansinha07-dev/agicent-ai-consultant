@@ -103,10 +103,8 @@ def ingest_website():
     )
 
     # Create unique doc id
-    doc_id = (
-        "agicent_website"
-        
-    )
+    doc_id = "agicent_website"
+    
 
     print(
         "\nRegistering "

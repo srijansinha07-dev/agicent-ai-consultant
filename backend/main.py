@@ -5,79 +5,111 @@ main.py — FastAPI application entry point.
 import os
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-
-from config import CORS_ORIGINS
 from routers import chat, documents, consultations
 from services import docstore
 
 app = FastAPI(
-    title="PDF Assistant API",
-    description="OCR-aware PDF assistant",
-    version="1.0.0",
+title="PDF Assistant API",
+description="OCR-aware PDF assistant",
+version="1.0.0",
 )
 
-from fastapi.middleware.cors import (
-    CORSMiddleware
-)
-
-origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://pdf-assistant-langgraph.vercel.app",
-    "https://agicent-ai-consultant-5x64ee7vu-srijansinha07-devs-projects.vercel.app",
-]
+# ── CORS ────────────────────────────────────────────────
 
 app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+CORSMiddleware,
+allow_origin_regex=r"https://.*.vercel.app",
+allow_credentials=True,
+allow_methods=["*"],
+allow_headers=["*"],
 )
 
 # ── Routers ─────────────────────────────────────────────
+
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(consultations.router)
 
-
 # ── Startup ─────────────────────────────────────────────
+
 @app.on_event("startup")
 async def startup():
-    print("🚀 SERVER STARTED")
 
-    try:
-        docstore.load_from_disk()
-        print("✅ DOCSTORE LOADED")
-    except Exception as e:
-        print(f"❌ DOCSTORE ERROR: {e}")
+```
+print("🚀 SERVER STARTED")
 
+try:
+    docstore.load_from_disk()
+    print("✅ DOCSTORE LOADED")
+
+except Exception as e:
+    print(f"❌ DOCSTORE ERROR: {e}")
+
+# ── Auto restore website knowledge base ────────────
+
+try:
+    from services.vectorstore import collection_exists
+
+    WEBSITE_DOC_ID = "agicent_website"
+
+    if collection_exists(WEBSITE_DOC_ID):
+
+        print(
+            "✅ Website vector collection exists"
+        )
+
+    else:
+
+        print(
+            "⚠️ Website collection missing"
+        )
+        print(
+            "🔄 Re-ingesting website..."
+        )
+
+        from ingest_website import (
+            ingest_website
+        )
+
+        ingest_website()
+
+        print(
+            "✅ Website re-ingested"
+        )
+
+except Exception as e:
+
+    print(
+        f"❌ Website auto-ingest failed: {e}"
+    )
+```
 
 # ── Routes ──────────────────────────────────────────────
+
 @app.get("/")
 def root():
-    return {
-        "message": "server working"
-    }
-
+return {
+"message": "server working"
+}
 
 @app.get("/api/health")
 def health():
-    return {
-        "status": "ok"
-    }
-
+return {
+"status": "ok"
+}
 
 # ── Run ─────────────────────────────────────────────────
-if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=int(
-            os.environ.get(
-                "PORT",
-                8000
-            )
-        ),
-    )
+
+if **name** == "**main**":
+uvicorn.run(
+"main:app",
+host="0.0.0.0",
+port=int(
+os.environ.get(
+"PORT",
+8000
+)
+),
+)
