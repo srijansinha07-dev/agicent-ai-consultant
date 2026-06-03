@@ -57,47 +57,7 @@ async def startup():
 
     # ── Ensure website knowledge base exists ───────────
 
-    try:
 
-        from services.vectorstore import (
-            collection_exists
-        )
-
-        WEBSITE_DOC_ID = "agicent_website"
-
-        if collection_exists(
-            WEBSITE_DOC_ID
-        ):
-
-            print(
-                "✅ Website vector collection exists"
-            )
-
-        else:
-
-            print(
-                "⚠️ Website collection missing"
-            )
-
-            print(
-                "🔄 Re-ingesting website..."
-            )
-
-            from ingest_website import (
-                ingest_website
-            )
-
-            ingest_website()
-
-            print(
-                "✅ Website re-ingested"
-            )
-
-    except Exception as e:
-
-        print(
-            f"❌ Website auto-ingest failed: {e}"
-        )
 
 # ── Routes ──────────────────────────────────────────────
 
