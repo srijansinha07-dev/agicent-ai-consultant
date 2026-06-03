@@ -4,10 +4,16 @@ main.py — FastAPI application entry point.
 
 import os
 import uvicorn
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import chat, documents, consultations
+from routers import (
+chat,
+documents,
+consultations
+)
+
 from services import docstore
 
 app = FastAPI(
@@ -40,21 +46,37 @@ async def startup():
 ```
 print("🚀 SERVER STARTED")
 
+# ── Load docstore ──────────────────────────────────
+
 try:
+
     docstore.load_from_disk()
-    print("✅ DOCSTORE LOADED")
+
+    print(
+        "✅ DOCSTORE LOADED"
+    )
 
 except Exception as e:
-    print(f"❌ DOCSTORE ERROR: {e}")
 
-# ── Auto restore website knowledge base ────────────
+    print(
+        f"❌ DOCSTORE ERROR: {e}"
+    )
+
+# ── Auto restore website embeddings ───────────────
 
 try:
-    from services.vectorstore import collection_exists
 
-    WEBSITE_DOC_ID = "agicent_website"
+    from services.vectorstore import (
+        collection_exists
+    )
 
-    if collection_exists(WEBSITE_DOC_ID):
+    WEBSITE_DOC_ID = (
+        "agicent_website"
+    )
+
+    if collection_exists(
+        WEBSITE_DOC_ID
+    ):
 
         print(
             "✅ Website vector collection exists"
@@ -65,6 +87,7 @@ try:
         print(
             "⚠️ Website collection missing"
         )
+
         print(
             "🔄 Re-ingesting website..."
         )
@@ -90,26 +113,35 @@ except Exception as e:
 
 @app.get("/")
 def root():
+
+```
 return {
-"message": "server working"
+    "message": "server working"
 }
+```
 
 @app.get("/api/health")
 def health():
+
+```
 return {
-"status": "ok"
+    "status": "ok"
 }
+```
 
 # ── Run ─────────────────────────────────────────────────
 
 if **name** == "**main**":
+
+```
 uvicorn.run(
-"main:app",
-host="0.0.0.0",
-port=int(
-os.environ.get(
-"PORT",
-8000
+    "main:app",
+    host="0.0.0.0",
+    port=int(
+        os.environ.get(
+            "PORT",
+            8000
+        )
+    ),
 )
-),
-)
+```
