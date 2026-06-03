@@ -257,6 +257,8 @@ async def ingest_website_debug():
         chunks
     )
 
+    print("SKIPPING INDEXING")
+
     docstore.set_status(
         doc_id,
         IndexStatus.READY
