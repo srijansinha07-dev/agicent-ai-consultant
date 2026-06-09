@@ -52,9 +52,10 @@ class RetrievalResult:
 # ── API request / response schemas ────────────────────────────────────────
 
 class ChatRequest(BaseModel):
-    doc_id:  str
-    query:   str
-    history: list[dict] = []
+    doc_id:     str
+    query:      str
+    history:    list[dict] = []
+    session_id: Optional[str] = None  # used by consultant agent for stateful memory
 
 class Source(BaseModel):
     doc_id:      str
@@ -67,9 +68,12 @@ class Source(BaseModel):
     url:         Optional[str] = None
 
 class ChatResponse(BaseModel):
-    answer:     str
+    answer: str
     query_type: QueryType
-    sources:    list[Source]
+    sources: list[Source]
+    consultationIntent: str | None = None
+    consultationSummary: str | None = None
+    availableSlots: list[dict] | None = None
 
 class DocumentInfo(BaseModel):
     doc_id:      str

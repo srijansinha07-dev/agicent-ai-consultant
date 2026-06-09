@@ -7,7 +7,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from config import CORS_ORIGINS
-from routers import chat, documents, consultations
+from routers import chat, documents, consultations, calendar
 from services import docstore
 
 app = FastAPI(
@@ -29,6 +29,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=origins,
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
@@ -40,6 +41,7 @@ app.add_middleware(
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(consultations.router)
+app.include_router(calendar.router)
 
 # ── Startup ─────────────────────────────────────────────
 

@@ -2,6 +2,7 @@ import type { ChatMessage } from '@/types/chat'
 
 import { FormattedAnswer } from './FormattedAnswer'
 import { ConsultantLogo } from './ConsultantLogo'
+import { BookingSlotPicker } from './BookingSlotPicker'
 
 interface MessageProps {
   message: ChatMessage
@@ -40,7 +41,16 @@ export function Message({ message }: MessageProps) {
         {isUser ? (
           <span>{message.content}</span>
         ) : (
-          <FormattedAnswer content={message.content} />
+          <>
+            <FormattedAnswer content={message.content} />
+
+            {message.availableSlots && message.availableSlots.length > 0 && (
+              <BookingSlotPicker
+                slots={message.availableSlots}
+                consultationSummary={message.consultationSummary}
+              />
+            )}
+          </>
         )}
       </div>
     </div>

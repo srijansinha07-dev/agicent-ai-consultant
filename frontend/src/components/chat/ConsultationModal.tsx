@@ -1,6 +1,12 @@
+import {
+  postConsultation,
+  getCalendarSlots,
+  bookCalendarSlot,
+} from '@/services/api'
+
 import { useEffect, useMemo, useState } from 'react'
 
-import { postConsultation } from '@/services/api'
+
 
 type ConversationHistoryItem = { role: string; content: string }
 
@@ -31,6 +37,14 @@ export function ConsultationModal({
   onSuccess,
 }: ConsultationModalProps) {
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
+  const [slots, setSlots] = useState<any[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+
+  const [selectedSlot, setSelectedSlot] = useState<any | null>(null)
+
+  const [bookingStatus, setBookingStatus] = useState<'idle' | 'booking' | 'success' | 'error'>('idle')
+
+  const [bookingResult, setBookingResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
 
   const [name, setName] = useState('')
@@ -96,15 +110,65 @@ export function ConsultationModal({
         return
       }
 
+      // Persist attendee info so BookingSlotPicker can pre-fill without re-asking.
+      try {
+        sessionStorage.setItem(
+          'agicent_attendee_info',
+          JSON.stringify({
+            name: name.trim(),
+            email: email.trim(),
+            company: company.trim(),
+            summary: projectDescription.trim(),
+          }),
+        )
+      } catch {
+        // ignore storage errors
+      }
+
       setStatus('success')
       onSuccess({
         consultationId: res.consultation_id ?? 'unknown',
         summary: res.summary ?? '',
       })
+
+      try {
+        setLoadingSlots(true)
+      
+        const slotData = await getCalendarSlots()
+      
+        setSlots(slotData.slots ?? [])
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoadingSlots(false)
+      }
     } catch (err) {
       setStatus('error')
       const message = err instanceof Error ? err.message : 'Submission failed. Please try again.'
       setError(message)
+    }
+  }
+  async function handleBooking() {
+    if (!selectedSlot) return
+  
+    try {
+      setBookingStatus('booking')
+  
+      const result = await bookCalendarSlot({
+        start_iso: selectedSlot.start,
+        end_iso: selectedSlot.end,
+  
+        attendee_email: email.trim(),
+        attendee_name: name.trim(),
+  
+        topic_summary: projectDescription.trim(),
+      })
+  
+      setBookingResult(result)
+      setBookingStatus('success')
+    } catch (err) {
+      console.error(err)
+      setBookingStatus('error')
     }
   }
 
@@ -172,28 +236,102 @@ export function ConsultationModal({
 
         <form onSubmit={onSubmit} style={{ padding: '16px' }}>
           {status === 'success' ? (
-            <div style={{ padding: '8px 4px 16px' }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>Submitted successfully</div>
-              <div style={{ color: 'var(--text-2)', fontSize: 14, lineHeight: 1.6 }}>
-                Agicent will review your request and get back to you shortly.
-              </div>
-              <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: 12,
-                    border: '1px solid var(--border-strong)',
-                    background: 'var(--bg-2)',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+           <div style={{ padding: '8px 4px 16px' }}>
+           <div style={{ fontWeight: 700, marginBottom: 8 }}>
+             Consultation Request Submitted
+           </div>
+         
+           <div
+             style={{
+               color: 'var(--text-2)',
+               fontSize: 14,
+               lineHeight: 1.6,
+               marginBottom: 16,
+             }}
+           >
+             Agicent has received your request.
+         
+             You can also book a discovery call immediately.
+           </div>
+         
+           {loadingSlots ? (
+             <div>Loading available times...</div>
+           ) : bookingStatus === 'success' ? (
+             <div>
+               <div style={{ fontWeight: 700 }}>
+                 🎉 Discovery Call Booked
+               </div>
+         
+               <div style={{ marginTop: 8 }}>
+                 Calendar invitation has been sent.
+               </div>
+         
+               {bookingResult?.html_link && (
+                 <a
+                   href={bookingResult.html_link}
+                   target="_blank"
+                   rel="noreferrer"
+                 >
+                   Open Calendar Event
+                 </a>
+               )}
+             </div>
+           ) : (
+             <>
+               <div
+                 style={{
+                   display: 'flex',
+                   flexDirection: 'column',
+                   gap: 8,
+                   marginBottom: 16,
+                 }}
+               >
+                 {slots.map((slot) => (
+                   <button
+                     key={slot.start}
+                     type="button"
+                     onClick={() => setSelectedSlot(slot)}
+                     style={{
+                       padding: 10,
+                       borderRadius: 10,
+                       border:
+                         selectedSlot?.start === slot.start
+                           ? '2px solid var(--accent)'
+                           : '1px solid var(--border-strong)',
+                       background: 'var(--bg-2)',
+                       textAlign: 'left',
+                       cursor: 'pointer',
+                     }}
+                   >
+                     {slot.display}
+                   </button>
+                 ))}
+               </div>
+         
+               {selectedSlot && (
+                 <button
+                   type="button"
+                   onClick={handleBooking}
+                   disabled={bookingStatus === 'booking'}
+                   style={{
+                     width: '100%',
+                     padding: '12px',
+                     border: 'none',
+                     borderRadius: 12,
+                     background: 'var(--agicent-gradient-trigger)',
+                     color: 'white',
+                     fontWeight: 700,
+                     cursor: 'pointer',
+                   }}
+                 >
+                   {bookingStatus === 'booking'
+                     ? 'Booking...'
+                     : 'Book Discovery Call'}
+                 </button>
+               )}
+             </>
+           )}
+         </div>
           ) : (
             <>
               {error && (

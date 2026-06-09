@@ -13,5 +13,20 @@
     },
     "pdf_path": "website://agicent",
     "suggestions": []
+  },
+  "agicent_website": {
+    "info": {
+      "doc_id": "agicent_website",
+      "user_id": "website_bot",
+      "name": "Agicent Website",
+      "pages": 250,
+      "status": "ready",
+      "ocr_pages": 0,
+      "chunks": 4020,
+      "upload_time": "2026-06-08T06:31:02.886068+00:00",
+      "suggestions": []
+    },
+    "pdf_path": "website://agicent",
+    "suggestions": []
   }
 }

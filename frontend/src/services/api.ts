@@ -19,8 +19,12 @@ const client = createApiClient()
 export async function postChat(
   payload: ChatRequest,
   userId: string = env.userId,
+  sessionId?: string,
 ): Promise<ChatResponse> {
-  const { data } = await client.post<ChatResponse>('/api/chat', payload, {
+  const body: ChatRequest = sessionId
+    ? { ...payload, session_id: sessionId }
+    : payload
+  const { data } = await client.post<ChatResponse>('/api/chat', body, {
     headers: {
       [USER_ID_HEADER]: userId,
     },
@@ -60,4 +64,32 @@ export async function postConsultation(
     },
   })
   return data
+}
+export async function getCalendarSlots() {
+  const res = await fetch(`${API_URL}/api/calendar/slots`)
+
+  if (!res.ok) {
+    throw new Error('Failed to load slots')
+  }
+
+  return res.json()
+}
+
+export async function bookCalendarSlot(payload: any) {
+  const res = await fetch(
+    `${API_URL}/api/calendar/book`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  )
+
+  if (!res.ok) {
+    throw new Error('Failed to book slot')
+  }
+
+  return res.json()
 }

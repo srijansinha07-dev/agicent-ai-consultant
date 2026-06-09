@@ -112,7 +112,7 @@ export function useChat(): UseChatReturn {
           doc_id: env.docId,
           query: query.trim(),
           history,
-        }, env.userId,)
+        }, env.userId, sessionId)
 
         const intent = computeConsultationIntent(userMessage)
 
@@ -123,7 +123,9 @@ export function useChat(): UseChatReturn {
           sources: response.sources,
           queryType: response.query_type,
           timestamp: Date.now(),
-          consultationIntent: intent,
+          consultationIntent: response.consultationIntent ?? intent,
+          consultationSummary: response.consultationSummary ?? undefined,
+          availableSlots: response.availableSlots ?? undefined,
         }
 
         setMessages((prev) => [...prev, assistantMessage])

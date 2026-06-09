@@ -9,7 +9,18 @@ from __future__ import annotations
 import re
 
 from models import Chunk
-from services.extractor import has_formula, FORMULA_RE
+
+FORMULA_RE = re.compile(
+    r'='
+    r'|\\frac'
+    r'|\\sum'
+    r'|\\int'
+    r'|\\sqrt'
+    r'|\\alpha|\\beta|\\gamma'
+)
+
+def has_formula(text: str) -> bool:
+    return bool(FORMULA_RE.search(text))
 
 
 def chunk_pages(pages: list[dict], doc_id: str) -> list[Chunk]:

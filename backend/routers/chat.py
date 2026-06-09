@@ -21,7 +21,8 @@ from models import (
 from services import docstore
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
-AGENTIC_ROUTER_ENABLED = os.getenv("AGENTIC_ROUTER_ENABLED", "true").lower() == "true"
+AGENTIC_ROUTER_ENABLED    = os.getenv("AGENTIC_ROUTER_ENABLED", "true").lower() == "true"
+CONSULTANT_AGENT_ENABLED = os.getenv("CONSULTANT_AGENT_ENABLED", "true").lower() == "true"
 
 
 @router.post("", response_model=ChatResponse)
@@ -39,9 +40,67 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
     from services.website_support import is_website_doc
     website_doc = is_website_doc(req.doc_id)
 
-    # ── Lightweight intent routing before retrieval (website consultant mode) ──
-    # Keeps consultant/retrieval pipeline unchanged for substantive queries.
-    if website_doc:
+    # ── NEW: Consultant Agent (stateful, token-optimised, agentic) ────────
+    # Takes priority over all legacy paths for website docs when enabled.
+    if website_doc and CONSULTANT_AGENT_ENABLED:
+        try:
+            from services.consultant_agent import run_consultant_agent
+
+            chunks = docstore.get_chunks(req.doc_id)
+            pages  = docstore.get_pages(req.doc_id)
+
+            session_id = req.session_id or x_user_id or "anon"
+
+            result = run_consultant_agent(
+                session_id  = session_id,
+                query       = req.query,
+                history     = req.history,
+                doc_id      = req.doc_id,
+                chunks_all  = chunks,
+                pages_all   = pages,
+                doc_info    = info,
+            )
+
+            answer           = result["answer"]
+            query_type       = result["query_type"] or QueryType.CONCEPT
+            retrieved_chunks = result["retrieved_chunks"]
+
+            consultation_intent = None
+            action = result.get("action")
+
+            if action in ["OFFER_CONSULTATION", "BOOK_CALL"]:
+                consultation_intent = "request"
+
+            # Build sources (same logic as below)
+            from services.website_support import (
+                derive_website_source_label,
+                extract_website_metadata,
+            )
+            sources = []
+            for c in retrieved_chunks:
+                url, title, heading = extract_website_metadata(c)
+                label = derive_website_source_label(url, title, heading)
+                if not label.strip():
+                    continue
+                sources.append(Source(
+                    doc_id      = req.doc_id,
+                    doc_name    = info.name,
+                    page        = c.page,
+                    text        = c.text[:400] + ("…" if len(c.text) > 400 else ""),
+                    ocr_sourced = c.ocr_sourced,
+                    confidence  = _confidence(c.score, c.ocr_sourced),
+                    label       = label,
+                    url         = url or None,
+                ))
+            return ChatResponse(answer=answer, query_type=query_type, sources=sources,consultationIntent=consultation_intent,consultationSummary=result.get("consultationSummary"),availableSlots=result.get("availableSlots"),)
+
+        except Exception as e:
+            print(f"[Chat Router] Consultant agent failed, falling back: {e}")
+            # Fall through to legacy path below
+
+    # ── Legacy: Lightweight intent routing (website consultant mode) ──────
+    # Only reached if consultant agent is disabled or raised an exception.
+    if website_doc and not CONSULTANT_AGENT_ENABLED:
         try:
             from services.intent_router import (
                 classify_intent,
@@ -104,6 +163,13 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
     query_type        = result["query_type"] or QueryType.CONCEPT
     retrieved_chunks  = result["retrieved_chunks"]
 
+    consultation_intent = None
+
+    action = result.get("action")
+
+    if action in ["OFFER_CONSULTATION", "BOOK_CALL"]:
+        consultation_intent = "request"
+
     # ── Build sources ─────────────────────────────────────────────────────
     from services.website_support import (
         derive_website_source_label,
@@ -137,6 +203,9 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
         answer=answer,
         query_type=query_type,
         sources=sources,
+        consultationIntent=consultation_intent,
+        consultationSummary=result.get("consultationSummary"),
+        availableSlots=result.get("availableSlots")
     )
 
 

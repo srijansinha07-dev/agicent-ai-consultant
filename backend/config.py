@@ -24,9 +24,40 @@ CONSULTATION_FORWARD_URL = os.getenv("CONSULTATION_FORWARD_URL", "").strip()
 # If set, admin staff can fetch stored consultations with this key.
 CONSULTATION_ADMIN_KEY = os.getenv("CONSULTATION_ADMIN_KEY", "").strip()
 
+# ── Consultant Agent ───────────────────────────────────────────────────────
+# Master toggle: "false" falls back to legacy langgraph path for website docs.
+CONSULTANT_AGENT_ENABLED = os.getenv("CONSULTANT_AGENT_ENABLED", "true").lower() == "true"
+
+# Conversation state TTL in seconds (default 2 hours).
+CONVERSATION_STATE_TTL_SECONDS = int(os.getenv("CONVERSATION_STATE_TTL_SECONDS", "7200"))
+
+# ── Google Calendar Integration ────────────────────────────────────────────
+# Base64-encoded service account JSON (preferred for production).
+GOOGLE_CALENDAR_CREDENTIALS_JSON = os.getenv("GOOGLE_CALENDAR_CREDENTIALS_JSON", "").strip()
+
+# Calendar to create events on ("primary" or full calendar ID).
+GOOGLE_CALENDAR_ID = os.getenv("GOOGLE_CALENDAR_ID", "primary").strip()
+
+# File-based OAuth token (used when GOOGLE_CALENDAR_CREDENTIALS_JSON is empty).
+GOOGLE_OAUTH_TOKEN_FILE = os.getenv(
+    "GOOGLE_OAUTH_TOKEN_FILE",
+    str(BASE_DIR / "data" / "calendar_token.json"),
+).strip()
+
+# File-based OAuth client secrets (first-time auth flow).
+GOOGLE_CLIENT_SECRETS_FILE = os.getenv(
+    "GOOGLE_CLIENT_SECRETS_FILE",
+    str(BASE_DIR / "data" / "calendar_credentials.json"),
+).strip()
+
+# Duration of discovery/consultation calls in minutes.
+MEETING_DURATION_MINUTES = int(os.getenv("MEETING_DURATION_MINUTES", "45"))
+
+# IANA timezone for calendar events.
+MEETING_TIMEZONE = os.getenv("MEETING_TIMEZONE", "America/New_York").strip()
+
 # ── Ollama models ──────────────────────────────────────────────────────────
-EMBED_MODEL = "nomic-embed-text"
-LLM_MODEL   = "mistral"
+
 
 USE_GROQ = os.getenv(
     "USE_GROQ",
@@ -48,10 +79,7 @@ print("KEY EXISTS:", bool(GROQ_API_KEY))
 # ── ChromaDB ───────────────────────────────────────────────────────────────
 CHROMA_PATH = str(CHROMA_DIR)
 
-# ── OCR ────────────────────────────────────────────────────────────────────
-# Pages with fewer meaningful chars than this get OCR'd
-OCR_THRESHOLD = 120
-OCR_DPI       = 220          # higher = better formula accuracy
+
 
 # ── Retrieval ──────────────────────────────────────────────────────────────
 TOP_K_SEMANTIC = 10

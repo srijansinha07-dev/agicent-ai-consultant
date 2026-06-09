@@ -158,7 +158,7 @@ export function ConsultantPanel({ chat }: ConsultantPanelProps) {
                 onClick={() => {
                   if (!lastAssistantMessage?.consultationIntent) return
                   setModalVariant(lastAssistantMessage.consultationIntent)
-                  setModalDefaultDescription(lastUserBeforeAssistant?.content)
+                  setModalDefaultDescription(lastAssistantMessage?.consultationSummary)
                   setModalOpen(true)
                 }}
                 style={{

@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 WEBSITE_TOP_K_SEMANTIC = 12
 WEBSITE_TOP_K_BM25 = 12
 WEBSITE_CANDIDATE_CAP = 12
-WEBSITE_TOP_K_FINAL = 11
-WEBSITE_CONTEXT_CHAR_LIMIT = 4800
+WEBSITE_TOP_K_FINAL = 5
+WEBSITE_CONTEXT_CHAR_LIMIT = 2500
 
 # ── Metadata score adjustments (additive, bounded) ─────────────────────────
 _URL_BOOSTS: tuple[tuple[str, float], ...] = (
@@ -370,3 +370,88 @@ WEBSITE_SUPPORT_RULES = (
     "- Sound like a senior consultant thinking through the problem step by step.\n"
     "- Emphasise recommendations, implementation approach, and practical next steps over generic benefits."
 )
+
+
+# ── Compressed consultant prompt (~80 tokens) ──────────────────────────────
+# Used by the new consultant_agent.py to save tokens on every request.
+# Behaviorally equivalent to WEBSITE_SUPPORT_RULES but dramatically shorter.
+CONSULTANT_PROMPT_COMPRESSED = (
+    "You are the Agicent AI Consultant. Speak as a senior Agicent solutions consultant.\n"
+    "Rules: Use ONLY retrieved CONTEXT. No invented pricing/timelines. "
+    "Be concise (120-220 words). No marketing clichés. "
+    "Recommend Agicent's approach, methodology, and delivery model. "
+    "If context is thin, say what Agicent can confirm and suggest a discovery call."
+)
+
+
+# ── Discovery question templates (zero LLM, deterministic) ────────────────
+# One question per missing discovery field. Keep them conversational.
+DISCOVERY_QUESTIONS: dict[str, str] = {
+    "industry": (
+        "What industry or vertical is this for? "
+        "(e.g. healthcare, fintech, edtech, SaaS, logistics…)"
+    ),
+    "project_type": (
+        "Are you starting fresh with an MVP, scaling an existing product, "
+        "or modernising something already in production?"
+    ),
+    "target_users": (
+        "Who are the primary users? "
+        "(e.g. consumers, enterprise teams, patients, developers…)"
+    ),
+    "timeline": (
+        "What's the timeline you're working with? "
+        "Is there a specific launch date, or is it more exploratory right now?"
+    ),
+    "budget": (
+        "Do you have a rough budget in mind? Even a ballpark helps us suggest "
+        "the right team model and scope."
+    ),
+    "company_stage": (
+        "What stage is your company or project at? "
+        "(pre-seed, seed, Series A, growth, or enterprise?)"
+    ),
+}
+
+
+# ── Domain guardrail response ──────────────────────────────────────────────
+DOMAIN_REDIRECT_MESSAGE = (
+    "That's outside my area — I'm specialised in software development, "
+    "AI solutions, product strategy, and digital transformation. "
+    "Happy to help if you have a project or tech question in mind."
+)
+
+
+# ── Consultation offer templates ────────────────────────────────────────────
+CONSULTATION_OFFER_MESSAGES = {
+    "default": (
+        "Based on what you've shared, this sounds like a strong fit for a focused "
+        "discovery session with the Agicent team. We could map out the right scope, "
+        "team model, and delivery approach in about 45 minutes.\n\n"
+        "Would you like to schedule a consultation?"
+    ),
+    "high_budget": (
+        "With the budget and timeline you've outlined, this is exactly the kind of "
+        "engagement we do well. I'd recommend a discovery call to nail down scope "
+        "and match you with the right team structure.\n\n"
+        "Want to set up a 45-minute session?"
+    ),
+    "mvp": (
+        "You've given me enough context to see a clear path here. "
+        "The next best step is a discovery session where we can define the MVP scope, "
+        "prioritise features, and sketch a realistic delivery plan.\n\n"
+        "Shall I help you book a consultation with Agicent?"
+    ),
+}
+
+
+def get_consultation_offer_message(state: "object") -> str:
+    """Pick the most contextually appropriate consultation offer message."""
+    try:
+        if getattr(state, "budget", None) and getattr(state, "timeline", None):
+            return CONSULTATION_OFFER_MESSAGES["high_budget"]
+        if getattr(state, "project_type", None) in ("mvp", "prototype", "poc"):
+            return CONSULTATION_OFFER_MESSAGES["mvp"]
+    except Exception:
+        pass
+    return CONSULTATION_OFFER_MESSAGES["default"]

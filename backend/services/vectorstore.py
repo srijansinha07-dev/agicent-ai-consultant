@@ -11,10 +11,10 @@ from __future__ import annotations
 import re
 
 import chromadb
-import ollama
+
 from chromadb.config import Settings
 
-from config import CHROMA_PATH, EMBED_MODEL, TOP_K_SEMANTIC
+from config import CHROMA_PATH,TOP_K_SEMANTIC
 from models import Chunk
 
 

@@ -62,3 +62,7 @@ Thumbs.db
 .idea/
 backend/data/crawled_pages.json
 backend/data/cleaned_pages.json
+backend/data/calendar_credentials.json
+backend/data/calendar_token.json
+.env
+.env.local

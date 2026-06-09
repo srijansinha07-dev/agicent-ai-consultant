@@ -284,6 +284,12 @@ def node_generate_answer(state: GraphState) -> GraphState:
                 max_tokens = 380
         except Exception:
             pass
+        print("\n===== CONTEXT DEBUG =====")
+        print("Context chars:", len(state["context"]))
+        print("Approx tokens:", len(state["context"]) // 4)
+        print("Context preview:")
+        print(state["context"][:500])
+        print("=========================\n")
         answer = _groq_call(prompt, max_tokens=max_tokens)
     except Exception as e:
         print(f"[LangGraph] Generation error: {e}")
