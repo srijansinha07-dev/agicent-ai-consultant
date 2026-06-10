@@ -1,0 +1,62 @@
+[
+  {
+    "id": "primary_consultant",
+    "name": "Primary Consultant",
+    "email": "consultant@agicent.com",
+    "active": true,
+    "calendar_id": "primary",
+    "working_hours": {
+      "start": "10:00",
+      "end": "19:00",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "leaves": [],
+    "unavailabilities": []
+  },
+  {
+    "id": "business_consultant",
+    "name": "Business Consultant",
+    "email": "business@agicent.com",
+    "active": true,
+    "calendar_id": "primary",
+    "working_hours": {
+      "start": "10:00",
+      "end": "19:00",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "leaves": [],
+    "unavailabilities": []
+  },
+  {
+    "id": "technical_consultant",
+    "name": "Technical Consultant",
+    "email": "tech@agicent.com",
+    "active": true,
+    "calendar_id": "primary",
+    "working_hours": {
+      "start": "10:00",
+      "end": "19:00",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "leaves": [],
+    "unavailabilities": []
+  }
+]

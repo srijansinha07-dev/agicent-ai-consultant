@@ -1,10 +1,10 @@
 import {
   postConsultation,
   getCalendarSlots,
-  bookCalendarSlot,
 } from '@/services/api'
 
 import { useEffect, useMemo, useState } from 'react'
+import { BookingSlotPicker } from './BookingSlotPicker'
 
 
 
@@ -18,9 +18,12 @@ interface ConsultationModalProps {
   sessionId: string
   history: ConversationHistoryItem[]
   defaultProjectDescription?: string
+  defaultBudget?: string
+  defaultTimeline?: string
   onClose: () => void
   onSuccess: (payload: { consultationId: string; summary: string }) => void
 }
+
 
 function validateEmail(email: string): boolean {
   // Simple but robust enough for client-side gating.
@@ -33,26 +36,25 @@ export function ConsultationModal({
   sessionId,
   history,
   defaultProjectDescription,
+  defaultBudget,
+  defaultTimeline,
   onClose,
   onSuccess,
 }: ConsultationModalProps) {
+
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const [slots, setSlots] = useState<any[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
-  const [selectedSlot, setSelectedSlot] = useState<any | null>(null)
-
-  const [bookingStatus, setBookingStatus] = useState<'idle' | 'booking' | 'success' | 'error'>('idle')
-
-  const [bookingResult, setBookingResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [company, setCompany] = useState('')
   const [projectDescription, setProjectDescription] = useState('')
-  const [budget, setBudget] = useState('')
-  const [timeline, setTimeline] = useState('')
+  const [budget, setBudget] = useState(defaultBudget ?? '')
+  const [timeline, setTimeline] = useState(defaultTimeline ?? '')
+
 
   const title = variant === 'connect' ? 'Connect with Agicent' : 'Request Consultation'
 
@@ -72,9 +74,10 @@ export function ConsultationModal({
     setEmail('')
     setCompany('')
     setProjectDescription(defaultProjectDescription ?? '')
-    setBudget('')
-    setTimeline('')
-  }, [open, defaultProjectDescription])
+    setBudget(defaultBudget ?? '')
+    setTimeline(defaultTimeline ?? '')
+  }, [open, defaultProjectDescription, defaultBudget, defaultTimeline])
+
 
   if (!open) return null
 
@@ -148,29 +151,7 @@ export function ConsultationModal({
       setError(message)
     }
   }
-  async function handleBooking() {
-    if (!selectedSlot) return
-  
-    try {
-      setBookingStatus('booking')
-  
-      const result = await bookCalendarSlot({
-        start_iso: selectedSlot.start,
-        end_iso: selectedSlot.end,
-  
-        attendee_email: email.trim(),
-        attendee_name: name.trim(),
-  
-        topic_summary: projectDescription.trim(),
-      })
-  
-      setBookingResult(result)
-      setBookingStatus('success')
-    } catch (err) {
-      console.error(err)
-      setBookingStatus('error')
-    }
-  }
+
 
   return (
     <div
@@ -226,12 +207,16 @@ export function ConsultationModal({
               background: 'rgba(255,255,255,0.18)',
               color: 'white',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
               <path d="M1.5 1.5L10.5 10.5M10.5 1.5L1.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </button>
+
         </div>
 
         <form onSubmit={onSubmit} style={{ padding: '16px' }}>
@@ -246,90 +231,25 @@ export function ConsultationModal({
                color: 'var(--text-2)',
                fontSize: 14,
                lineHeight: 1.6,
-               marginBottom: 16,
+               marginBottom: 12,
              }}
            >
-             Agicent has received your request.
-         
-             You can also book a discovery call immediately.
+             Agicent has received your request. Book a discovery call below.
            </div>
          
            {loadingSlots ? (
-             <div>Loading available times...</div>
-           ) : bookingStatus === 'success' ? (
-             <div>
-               <div style={{ fontWeight: 700 }}>
-                 🎉 Discovery Call Booked
-               </div>
-         
-               <div style={{ marginTop: 8 }}>
-                 Calendar invitation has been sent.
-               </div>
-         
-               {bookingResult?.html_link && (
-                 <a
-                   href={bookingResult.html_link}
-                   target="_blank"
-                   rel="noreferrer"
-                 >
-                   Open Calendar Event
-                 </a>
-               )}
+             <div style={{ fontSize: 13, color: 'var(--text-2)', padding: '8px 0' }}>
+               Loading available times…
              </div>
+           ) : slots.length > 0 ? (
+             <BookingSlotPicker
+               slots={slots}
+               consultationSummary={projectDescription.trim()}
+             />
            ) : (
-             <>
-               <div
-                 style={{
-                   display: 'flex',
-                   flexDirection: 'column',
-                   gap: 8,
-                   marginBottom: 16,
-                 }}
-               >
-                 {slots.map((slot) => (
-                   <button
-                     key={slot.start}
-                     type="button"
-                     onClick={() => setSelectedSlot(slot)}
-                     style={{
-                       padding: 10,
-                       borderRadius: 10,
-                       border:
-                         selectedSlot?.start === slot.start
-                           ? '2px solid var(--accent)'
-                           : '1px solid var(--border-strong)',
-                       background: 'var(--bg-2)',
-                       textAlign: 'left',
-                       cursor: 'pointer',
-                     }}
-                   >
-                     {slot.display}
-                   </button>
-                 ))}
-               </div>
-         
-               {selectedSlot && (
-                 <button
-                   type="button"
-                   onClick={handleBooking}
-                   disabled={bookingStatus === 'booking'}
-                   style={{
-                     width: '100%',
-                     padding: '12px',
-                     border: 'none',
-                     borderRadius: 12,
-                     background: 'var(--agicent-gradient-trigger)',
-                     color: 'white',
-                     fontWeight: 700,
-                     cursor: 'pointer',
-                   }}
-                 >
-                   {bookingStatus === 'booking'
-                     ? 'Booking...'
-                     : 'Book Discovery Call'}
-                 </button>
-               )}
-             </>
+             <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+               No slots available right now. Our team will reach out to schedule.
+             </div>
            )}
          </div>
           ) : (

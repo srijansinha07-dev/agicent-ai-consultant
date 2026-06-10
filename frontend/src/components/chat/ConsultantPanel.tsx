@@ -7,6 +7,7 @@ import { MessageList } from './MessageList'
 import { ConsultationModal } from './ConsultationModal'
 import { PanelHeader } from './PanelHeader'
 import { StarterPrompts } from './StarterPrompts'
+import { AdminPanel } from './AdminPanel'
 
 interface ConsultantPanelProps {
   chat: UseChatReturn
@@ -31,6 +32,26 @@ export function ConsultantPanel({ chat }: ConsultantPanelProps) {
   const [modalDefaultDescription, setModalDefaultDescription] = useState<string | undefined>(undefined)
 
   const [ctaSubmitted, setCtaSubmitted] = useState(false)
+
+  const [isAdminView, setIsAdminView] = useState(false)
+  const [savedViewMode, setSavedViewMode] = useState<typeof chat.viewMode>('widget')
+
+  const handleToggleAdmin = () => {
+    if (isAdminView) {
+      setIsAdminView(false)
+      chat.setViewMode(savedViewMode)
+    } else {
+      setSavedViewMode(chat.viewMode)
+      setIsAdminView(true)
+      chat.setViewMode('expanded')
+    }
+  }
+
+  useEffect(() => {
+    if (chat.viewMode !== 'expanded' && isAdminView) {
+      setIsAdminView(false)
+    }
+  }, [chat.viewMode, isAdminView])
 
   useEffect(() => {
     try {
@@ -64,6 +85,23 @@ export function ConsultantPanel({ chat }: ConsultantPanelProps) {
     if (ctaSubmitted) return false
     return !!lastAssistantMessage.consultationIntent
   }, [chat.isLoading, modalOpen, lastAssistantMessage, ctaSubmitted])
+
+  const latestBudget = useMemo(() => {
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+      const msg = chat.messages[i]
+      if (msg.role === 'assistant' && msg.budget) return msg.budget
+    }
+    return undefined
+  }, [chat.messages])
+
+  const latestTimeline = useMemo(() => {
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+      const msg = chat.messages[i]
+      if (msg.role === 'assistant' && msg.timeline) return msg.timeline
+    }
+    return undefined
+  }, [chat.messages])
+
 
   const shellStyle: React.CSSProperties = isExpanded
     ? {
@@ -116,79 +154,97 @@ export function ConsultantPanel({ chat }: ConsultantPanelProps) {
           chat.setViewMode(chat.viewMode === 'expanded' ? 'widget' : 'expanded')
         }
         onClose={() => chat.setViewMode('closed')}
+        isAdminView={isAdminView}
+        onToggleAdmin={handleToggleAdmin}
       />
 
-      <div
-        className="consultant-workspace-body chat-scroll"
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          background: isExpanded ? 'var(--bg)' : 'var(--bg-2)',
-        }}
-      >
-        <div className="consultant-workspace-inner">
-          {isEmpty ? (
-            <StarterPrompts
-              welcome={WELCOME_MESSAGE}
-              prompts={STARTER_PROMPTS}
-              onSelect={chat.sendMessage}
+      {isAdminView ? (
+        <div
+          className="consultant-workspace-body chat-scroll"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            background: 'var(--bg)',
+          }}
+        >
+          <AdminPanel />
+        </div>
+      ) : (
+        <>
+          <div
+            className="consultant-workspace-body chat-scroll"
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              background: isExpanded ? 'var(--bg)' : 'var(--bg-2)',
+            }}
+          >
+            <div className="consultant-workspace-inner">
+              {isEmpty ? (
+                <StarterPrompts
+                  welcome={WELCOME_MESSAGE}
+                  prompts={STARTER_PROMPTS}
+                  onSelect={chat.sendMessage}
+                  isExpanded={isExpanded}
+                />
+              ) : (
+                <MessageList
+                  messages={chat.messages}
+                  isLoading={chat.isLoading}
+                  error={chat.error}
+                />
+              )}
+
+              {showConsultationCta ? (
+                <div
+                  style={{
+                    margin: '10px 16px 0',
+                    padding: '12px 14px',
+                    borderRadius: 14,
+                    border: '1px solid var(--accent-border)',
+                    background: 'rgba(240, 90, 40, 0.06)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!lastAssistantMessage?.consultationIntent) return
+                      setModalVariant(lastAssistantMessage.consultationIntent)
+                      setModalDefaultDescription(lastAssistantMessage?.consultationSummary)
+                      setModalOpen(true)
+                    }}
+                    style={{
+                      width: '100%',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--accent)',
+                      fontWeight: 800,
+                      fontSize: 14,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    {lastAssistantMessage?.consultationIntent === 'connect'
+                      ? '[Connect with Agicent]'
+                      : '[Request Consultation]'}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className={isExpanded ? 'consultant-workspace-footer' : undefined}>
+            <ChatInput
+              onSend={chat.sendMessage}
+              disabled={chat.isLoading}
+              isEmpty={isEmpty}
               isExpanded={isExpanded}
             />
-          ) : (
-            <MessageList
-              messages={chat.messages}
-              isLoading={chat.isLoading}
-              error={chat.error}
-            />
-          )}
-
-          {showConsultationCta ? (
-            <div
-              style={{
-                margin: '10px 16px 0',
-                padding: '12px 14px',
-                borderRadius: 14,
-                border: '1px solid var(--accent-border)',
-                background: 'rgba(240, 90, 40, 0.06)',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  if (!lastAssistantMessage?.consultationIntent) return
-                  setModalVariant(lastAssistantMessage.consultationIntent)
-                  setModalDefaultDescription(lastAssistantMessage?.consultationSummary)
-                  setModalOpen(true)
-                }}
-                style={{
-                  width: '100%',
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--accent)',
-                  fontWeight: 800,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                {lastAssistantMessage?.consultationIntent === 'connect'
-                  ? '[Connect with Agicent]'
-                  : '[Request Consultation]'}
-              </button>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className={isExpanded ? 'consultant-workspace-footer' : undefined}>
-        <ChatInput
-          onSend={chat.sendMessage}
-          disabled={chat.isLoading}
-          isEmpty={isEmpty}
-          isExpanded={isExpanded}
-        />
-      </div>
+          </div>
+        </>
+      )}
 
       <ConsultationModal
         open={modalOpen}
@@ -196,7 +252,10 @@ export function ConsultantPanel({ chat }: ConsultantPanelProps) {
         sessionId={chat.sessionId}
         history={chat.messages.map((m) => ({ role: m.role, content: m.content }))}
         defaultProjectDescription={modalDefaultDescription}
+        defaultBudget={latestBudget}
+        defaultTimeline={latestTimeline}
         onClose={() => setModalOpen(false)}
+
         onSuccess={(_payload) => {
           // Mark as submitted so we do not keep re-offering in this session.
           setCtaSubmitted(true)

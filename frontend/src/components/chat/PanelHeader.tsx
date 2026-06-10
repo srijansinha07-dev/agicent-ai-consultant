@@ -8,9 +8,19 @@ interface PanelHeaderProps {
   onHome: () => void
   onExpand: () => void
   onClose: () => void
+  isAdminView?: boolean
+  onToggleAdmin?: () => void
 }
 
-export function PanelHeader({ viewMode, showHome, onHome, onExpand, onClose }: PanelHeaderProps) {
+export function PanelHeader({
+  viewMode,
+  showHome,
+  onHome,
+  onExpand,
+  onClose,
+  isAdminView = false,
+  onToggleAdmin,
+}: PanelHeaderProps) {
   const isExpanded = viewMode === 'expanded'
 
   return (
@@ -26,7 +36,33 @@ export function PanelHeader({ viewMode, showHome, onHome, onExpand, onClose }: P
         flexShrink: 0,
       }}
     >
-      {showHome ? (
+      {isAdminView ? (
+        <button
+          type="button"
+          onClick={onToggleAdmin}
+          style={{
+            border: 'none',
+            background: 'rgba(255,255,255,0.18)',
+            color: 'white',
+            cursor: 'pointer',
+            fontFamily: 'var(--font)',
+            fontSize: '13px',
+            fontWeight: 600,
+            padding: '6px 12px',
+            borderRadius: '8px',
+            flexShrink: 0,
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.28)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.18)'
+          }}
+        >
+          ← Back to Chat
+        </button>
+      ) : showHome ? (
         <button
           type="button"
           onClick={onHome}
@@ -66,7 +102,7 @@ export function PanelHeader({ viewMode, showHome, onHome, onExpand, onClose }: P
             lineHeight: 1.2,
           }}
         >
-          Agicent AI Consultant
+          {isAdminView ? 'Agicent Admin Console' : 'Agicent AI Consultant'}
         </div>
         <div
           style={{
@@ -86,11 +122,38 @@ export function PanelHeader({ viewMode, showHome, onHome, onExpand, onClose }: P
               background: '#4ade80',
             }}
           />
-          Ask about AI, MVPs & development
+          {isAdminView ? 'Manage schedules & consultants' : 'Ask about AI, MVPs & development'}
         </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {!isAdminView && onToggleAdmin && (
+          <button
+            type="button"
+            onClick={onToggleAdmin}
+            style={{
+              border: 'none',
+              background: 'rgba(255,255,255,0.18)',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontWeight: 700,
+              padding: '6px 10px',
+              borderRadius: '6px',
+              transition: 'background 0.15s',
+              marginRight: '4px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.28)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.18)'
+            }}
+          >
+            Admin
+          </button>
+        )}
+
         <HeaderIconButton
           label={isExpanded ? 'Collapse to widget' : 'Expand workspace'}
           onClick={onExpand}
@@ -116,6 +179,7 @@ export function PanelHeader({ viewMode, showHome, onHome, onExpand, onClose }: P
     </div>
   )
 }
+
 
 function HeaderIconButton({
   label,

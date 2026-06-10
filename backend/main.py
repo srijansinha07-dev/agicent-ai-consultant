@@ -7,7 +7,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from config import CORS_ORIGINS
-from routers import chat, documents, consultations, calendar
+from routers import chat, documents, consultations, calendar, admin
 from services import docstore
 
 app = FastAPI(
@@ -42,6 +42,8 @@ app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(consultations.router)
 app.include_router(calendar.router)
+app.include_router(admin.router)
+
 
 # ── Startup ─────────────────────────────────────────────
 

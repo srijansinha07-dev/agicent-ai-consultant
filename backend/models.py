@@ -74,6 +74,9 @@ class ChatResponse(BaseModel):
     consultationIntent: str | None = None
     consultationSummary: str | None = None
     availableSlots: list[dict] | None = None
+    budget: str | None = None
+    timeline: str | None = None
+
 
 class DocumentInfo(BaseModel):
     doc_id:      str
@@ -142,3 +145,61 @@ class ConsultationRecord(BaseModel):
 
     # Stored for staff context; can be omitted later if needed.
     conversation_history: list[ConsultationConversationItem] = []
+
+
+# ── Multi-Consultant & Admin Panel Schemas ─────────────────────────────────
+
+class ConsultantWorkingHours(BaseModel):
+    start: str  # "HH:MM" e.g., "10:00"
+    end: str    # "HH:MM" e.g., "18:00"
+    days: list[int]  # [0, 1, 2, 3, 4] for Mon-Fri
+
+class ConsultantLeave(BaseModel):
+    start: str  # ISO datetime string
+    end: str    # ISO datetime string
+    description: Optional[str] = None
+
+class ConsultantUnavailability(BaseModel):
+    start: str  # ISO datetime string
+    end: str    # ISO datetime string
+    description: Optional[str] = None
+
+class Consultant(BaseModel):
+    id: str
+    name: str
+    email: str
+    active: bool
+    calendar_id: str
+    working_hours: ConsultantWorkingHours
+    leaves: list[ConsultantLeave] = []
+    unavailabilities: list[ConsultantUnavailability] = []
+
+class Booking(BaseModel):
+    booking_id: str
+    consultant_id: str
+    attendee_name: str
+    attendee_email: str
+    company: Optional[str] = None
+    topic_summary: Optional[str] = None
+    start_iso: str
+    end_iso: str
+    event_id: str
+    html_link: str
+    attendee_link: Optional[str] = None
+    meet_link: Optional[str] = None
+    status: str  # "scheduled" | "cancelled" | "completed"
+    created_at: str
+
+class AdminDashboardStats(BaseModel):
+    total_bookings: int
+    active_consultants: int
+    today_bookings_count: int
+    pending_consultations_count: int
+
+class AdminLoginRequest(BaseModel):
+    key: str
+
+class AdminLoginResponse(BaseModel):
+    token: str
+    ok: bool
+

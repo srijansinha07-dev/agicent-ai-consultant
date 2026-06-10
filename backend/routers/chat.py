@@ -92,7 +92,17 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
                     label       = label,
                     url         = url or None,
                 ))
-            return ChatResponse(answer=answer, query_type=query_type, sources=sources,consultationIntent=consultation_intent,consultationSummary=result.get("consultationSummary"),availableSlots=result.get("availableSlots"),)
+            return ChatResponse(
+                answer=answer,
+                query_type=query_type,
+                sources=sources,
+                consultationIntent=consultation_intent,
+                consultationSummary=result.get("consultationSummary"),
+                availableSlots=result.get("availableSlots"),
+                budget=result.get("budget"),
+                timeline=result.get("timeline"),
+            )
+
 
         except Exception as e:
             print(f"[Chat Router] Consultant agent failed, falling back: {e}")

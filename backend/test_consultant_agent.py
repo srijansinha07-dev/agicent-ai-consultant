@@ -140,6 +140,23 @@ for bq in booking_queries:
           action_b == AgentAction.BOOK_CALL,
           f"got {action_b}")
 
+# Check first-turn strong booking intent
+state6_first = ConversationState()
+state6_first.turn_count = 1  # first message from user
+strong_booking_queries = [
+    "book a call",
+    "schedule a consultation",
+    "schedule a meeting",
+    "book a discovery call",
+    "talk to someone",
+]
+for bq in strong_booking_queries:
+    action_sb = decide(bq, state6_first)
+    check(f"Strong booking intent (first turn): '{bq}'",
+          action_sb == AgentAction.BOOK_CALL,
+          f"got {action_sb}")
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Scenario 7 — Rolling summary helpers

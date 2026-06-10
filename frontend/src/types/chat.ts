@@ -45,6 +45,8 @@ export interface ChatResponse {
   consultationIntent?: 'request' | 'connect' | null
   consultationSummary?: string | null
   availableSlots?: SlotOption[] | null
+  budget?: string | null
+  timeline?: string | null
 }
 
 export interface ChatMessage {
@@ -60,4 +62,7 @@ export interface ChatMessage {
   consultationSummary?: string
   /** Optional: bookable calendar slots returned by the agent. */
   availableSlots?: SlotOption[]
+  budget?: string
+  timeline?: string
 }
+

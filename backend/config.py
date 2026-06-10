@@ -51,10 +51,11 @@ GOOGLE_CLIENT_SECRETS_FILE = os.getenv(
 ).strip()
 
 # Duration of discovery/consultation calls in minutes.
-MEETING_DURATION_MINUTES = int(os.getenv("MEETING_DURATION_MINUTES", "45"))
+MEETING_DURATION_MINUTES = int(os.getenv("MEETING_DURATION_MINUTES", "60"))
 
 # IANA timezone for calendar events.
-MEETING_TIMEZONE = os.getenv("MEETING_TIMEZONE", "America/New_York").strip()
+MEETING_TIMEZONE = os.getenv("MEETING_TIMEZONE", "Asia/Kolkata").strip()
+
 
 # ── Ollama models ──────────────────────────────────────────────────────────
 

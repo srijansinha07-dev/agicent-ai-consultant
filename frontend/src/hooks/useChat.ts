@@ -126,7 +126,10 @@ export function useChat(): UseChatReturn {
           consultationIntent: response.consultationIntent ?? intent,
           consultationSummary: response.consultationSummary ?? undefined,
           availableSlots: response.availableSlots ?? undefined,
+          budget: response.budget ?? undefined,
+          timeline: response.timeline ?? undefined,
         }
+
 
         setMessages((prev) => [...prev, assistantMessage])
       } catch (err) {

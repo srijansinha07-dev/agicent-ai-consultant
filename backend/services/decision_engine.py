@@ -47,6 +47,11 @@ _OFF_TOPIC_SIGNALS = frozenset([
 
 
 # ── Booking signals ────────────────────────────────────────────────────────
+_STRONG_BOOK_SIGNALS = re.compile(
+    r"\b(book\s+a\s+call|schedule\s+a\s+consultation|schedule\s+a\s+meeting|book\s+a\s+discovery\s+call|talk\s+to\s+someone)\b",
+    re.IGNORECASE,
+)
+
 _BOOK_SIGNALS = re.compile(
     r"\b(book|schedule|set up|arrange|calendar|meeting|call|slot|appointment"
     r"|talk to someone|speak with|connect me|get in touch|reach out)\b",
@@ -99,6 +104,9 @@ def decide(
         return AgentAction.REDIRECT_TO_DOMAIN
 
     # 2. Explicit booking intent
+    if _STRONG_BOOK_SIGNALS.search(q_lower):
+        return AgentAction.BOOK_CALL
+
     if _BOOK_SIGNALS.search(q_lower) and state.turn_count >= 2:
         return AgentAction.BOOK_CALL
 

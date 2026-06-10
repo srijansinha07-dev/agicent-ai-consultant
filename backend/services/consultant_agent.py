@@ -82,7 +82,7 @@ def run_consultant_agent(
     # ── Fast paths (zero LLM tokens) ──────────────────────────────────────
     if action == AgentAction.REDIRECT_TO_DOMAIN:
         return _zero_token_response(DOMAIN_REDIRECT_MESSAGE, doc_info,
-                                    session_id, action)
+                                    session_id, action, state=state)
 
     if action == AgentAction.ASK_DISCOVERY_QUESTION:
         return _handle_discovery(state, session_id, query, history, doc_info, action)
@@ -104,7 +104,7 @@ def run_consultant_agent(
 
         msg = get_consultation_offer_message(state)
 
-        return _pack(answer=msg,retrieved_chunks=[],doc_info=doc_info,action=action,consultation_summary=consultation_summary,)
+        return _pack(answer=msg,retrieved_chunks=[],doc_info=doc_info,action=action,consultation_summary=consultation_summary,budget=state.budget,timeline=state.timeline)
 
     if action == AgentAction.BOOK_CALL:
         return _handle_book_call(state, session_id, doc_info, action)
@@ -156,7 +156,7 @@ def _handle_discovery(
         )
         state.mark_asked("industry")
         cs_store.update(session_id, state)
-        return _zero_token_response(msg, doc_info, session_id, action)
+        return _zero_token_response(msg, doc_info, session_id, action, state=state)
 
     # Ack → brief and pivot
     _ack_re = re.compile(
@@ -171,10 +171,10 @@ def _handle_discovery(
             state.mark_asked(next_field)
             cs_store.update(session_id, state)
             msg = f"Got it. {q_text}"
-            return _zero_token_response(msg, doc_info, session_id, action)
+            return _zero_token_response(msg, doc_info, session_id, action, state=state)
         return _zero_token_response(
             "Got it. What would you like to dig into next?",
-            doc_info, session_id, action,
+            doc_info, session_id, action, state=state
         )
 
     # Missing field → ask next discovery question
@@ -189,7 +189,7 @@ def _handle_discovery(
             msg = f"Interesting. {q_text}"
         else:
             msg = q_text
-        return _zero_token_response(msg, doc_info, session_id, action)
+        return _zero_token_response(msg, doc_info, session_id, action, state=state)
 
     # All fields known — pivot to retrieval
     return _handle_retrieve_and_answer(
@@ -219,11 +219,12 @@ def _handle_book_call(
         slots = cal.get_available_slots(days_ahead=7)
 
         if slots:
-            print("[ConsultantAgent] BOOKING SLOTS:", slots[:5])
+            print(f"[ConsultantAgent] BOOKING SLOTS: {len(slots)} slots across multiple days")
             return _zero_token_response(
                 "Select a discovery call slot below.",
                 doc_info, session_id, action,
-                available_slots=slots[:5],
+                state=state,
+                available_slots=slots,
             )
 
     except Exception as e:
@@ -237,7 +238,7 @@ def _handle_book_call(
         "project description, and preferred timeline. "
         "The Agicent team will follow up within one business day."
     )
-    return _zero_token_response(msg, doc_info, session_id, action)
+    return _zero_token_response(msg, doc_info, session_id, action, state=state)
 
 
 def _handle_recommendation(
@@ -284,7 +285,7 @@ def _handle_recommendation(
         retrieval_used=bool(retrieved_chunks), chunk_count=len(retrieved_chunks),
         context_chars=len(context_text),
     )
-    return _pack(answer,retrieved_chunks,doc_info,action=action)
+    return _pack(answer,retrieved_chunks,doc_info,action=action,budget=state.budget,timeline=state.timeline)
 
 
 def _handle_retrieve_and_answer(
@@ -328,7 +329,7 @@ def _handle_retrieve_and_answer(
         retrieval_used=bool(retrieved_chunks), chunk_count=len(retrieved_chunks),
         context_chars=len(context_text),
     )
-    return _pack(answer,retrieved_chunks,doc_info,action=action)
+    return _pack(answer,retrieved_chunks,doc_info,action=action,budget=state.budget,timeline=state.timeline)
 
 
 # ── Rolling summary ────────────────────────────────────────────────────────
@@ -434,6 +435,7 @@ def _zero_token_response(
     doc_info: Any,
     session_id: str,
     action: AgentAction,
+    state: ConversationState | None = None,
     available_slots=None,
 ) -> dict:
     """Return a deterministic response without any LLM call."""
@@ -442,7 +444,9 @@ def _zero_token_response(
         prompt="", answer=message,
         retrieval_used=False, chunk_count=0, context_chars=0,
     )
-    return _pack(message, [], doc_info, action=action, available_slots=available_slots)
+    budget = state.budget if state else None
+    timeline = state.timeline if state else None
+    return _pack(message, [], doc_info, action=action, available_slots=available_slots, budget=budget, timeline=timeline)
 
 def _pack(
     answer: str,
@@ -451,6 +455,8 @@ def _pack(
     action=None,
     consultation_summary: str | None = None,
     available_slots=None,
+    budget: str | None = None,
+    timeline: str | None = None,
 ) -> dict:
     return {
         "answer": answer,
@@ -460,4 +466,6 @@ def _pack(
         "action": action,
         "consultationSummary": consultation_summary,
         "availableSlots": available_slots,
+        "budget": budget,
+        "timeline": timeline,
     }
