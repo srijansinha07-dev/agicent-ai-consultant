@@ -207,7 +207,11 @@ class GoogleCalendarService:
         Try credential sources in priority order:
         1. GOOGLE_CALENDAR_CREDENTIALS_JSON env var (base64 service account)
         2. GOOGLE_CLIENT_SECRETS_FILE + GOOGLE_OAUTH_TOKEN_FILE (OAuth2)
+
         """
+        print("GOOGLE_CALENDAR_CREDENTIALS_JSON exists:", bool(GOOGLE_CALENDAR_CREDENTIALS_JSON))
+        print("GOOGLE_OAUTH_CREDENTIALS_JSON exists:", bool(os.getenv("GOOGLE_OAUTH_CREDENTIALS_JSON")))
+        print("GOOGLE_OAUTH_TOKEN_JSON exists:", bool(os.getenv("GOOGLE_OAUTH_TOKEN_JSON")))
         from google.oauth2 import service_account
         from google.auth.transport.requests import Request
         from google.oauth2.credentials import Credentials
