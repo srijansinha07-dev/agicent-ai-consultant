@@ -109,6 +109,7 @@ def semantic_search(
 ) -> list[Chunk]:
     col   = get_or_create_collection(doc_id)
     count = col.count()
+    print(f"[Debug Vectorstore] semantic_search called with doc_id={doc_id}, collection={col.name}, CHROMA_PATH={CHROMA_PATH}, count={count}")
     if count == 0:
         return []
 

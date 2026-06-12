@@ -10,7 +10,13 @@ load_dotenv()
 # ── Paths ──────────────────────────────────────────────────────────────────
 BASE_DIR      = Path(__file__).parent
 UPLOAD_DIR    = BASE_DIR / "uploads"
-CHROMA_DIR    = BASE_DIR / "chroma_db"
+
+# Support Railway volume mount at /app/chroma_db
+if os.path.exists("/app/chroma_db"):
+    CHROMA_DIR = Path("/app/chroma_db")
+else:
+    CHROMA_DIR = Path(os.getenv("CHROMA_PATH_DIR", BASE_DIR / "chroma_db"))
+
 CONSULTATIONS_FILE = BASE_DIR / "data" / "consultations.json"
 
 UPLOAD_DIR.mkdir(exist_ok=True)

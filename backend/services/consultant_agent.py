@@ -677,11 +677,18 @@ def _retrieve(
     """Call existing retriever with intent-aware chunk budget. Returns (chunks, context_text)."""
     try:
         from services import retriever as ret_svc
+        
+        print(f"[Debug Retrieval] consultant_agent._retrieve called with doc_id: {doc_id}")
+        print(f"[Debug Retrieval] consultant_agent: chunks_all length={len(chunks_all)}")
+        
         result = ret_svc.retrieve(
             doc_id=doc_id, query=query,
             chunks=chunks_all, pages=pages_all,
         )
+        
         chunks = (result.chunks or [])[:max_chunks]  # hard cap from caller
+        print(f"[Debug Retrieval] consultant_agent: ret_svc.retrieve returned {len(chunks)} chunks")
+        
         parts = []
         size  = 0
         for c in chunks:

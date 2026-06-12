@@ -243,6 +243,7 @@ def _hybrid(
             query,
             top_k=sem_k,
         )
+        print(f"[Debug Retrieval] retriever._hybrid: vs.semantic_search returned {len(sem)} chunks for doc_id={doc_id}")
 
         kw = _bm25_search(
             doc_id,
