@@ -218,50 +218,26 @@ class GoogleCalendarService:
 
         SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
-        # ── Mode 1: Service account via env var ──────────────────────────
+        # ── Mode 1: Production (Service Account via env var) ──────────────────
         if GOOGLE_CALENDAR_CREDENTIALS_JSON:
-
-            oauth_json = os.getenv("GOOGLE_OAUTH_CREDENTIALS_JSON", "")
-            token_json = os.getenv("GOOGLE_OAUTH_TOKEN_JSON", "")
-
-        if oauth_json and token_json:
-            from google.oauth2.credentials import Credentials
-
-            creds_info = json.loads(
-                base64.b64decode(token_json).decode()
-            )
-
-            creds = Credentials.from_authorized_user_info(
-                creds_info,
-                SCOPES
-            )
-            return creds
             try:
                 raw = base64.b64decode(GOOGLE_CALENDAR_CREDENTIALS_JSON).decode()
                 info = json.loads(raw)
                 creds = service_account.Credentials.from_service_account_info(
                     info, scopes=SCOPES
                 )
+                print("[Calendar] Auth Mode: Service Account")
+                print("[Calendar] Credential Type: service_account")
+                print(f"[Calendar] Calendar ID: {GOOGLE_CALENDAR_ID}")
+                print("[Calendar] Initialization successful")
                 return creds
             except Exception as e:
+                print(f"[Calendar] Failed loading service account: {e}")
                 raise CalendarNotConfiguredError(
                     f"Failed to load service account from GOOGLE_CALENDAR_CREDENTIALS_JSON: {e}"
                 )
 
-        # ── Mode 2: Service account via file ─────────────────────────────
-        sa_file = os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE", "")
-        if sa_file and os.path.exists(sa_file):
-            try:
-                creds = service_account.Credentials.from_service_account_file(
-                    sa_file, scopes=SCOPES
-                )
-                return creds
-            except Exception as e:
-                raise CalendarNotConfiguredError(
-                    f"Failed to load service account from file {sa_file}: {e}"
-                )
-
-        # ── Mode 3: OAuth2 token file ──────────────────────────────────
+        # ── Mode 2: Local Development (OAuth2 token files) ────────────────────
         token_file   = GOOGLE_OAUTH_TOKEN_FILE
         secrets_file = GOOGLE_CLIENT_SECRETS_FILE
 
@@ -270,19 +246,27 @@ class GoogleCalendarService:
             creds = Credentials.from_authorized_user_file(token_file, SCOPES)
 
         if creds and creds.valid:
+            print("[Calendar] Auth Mode: OAuth")
+            print("[Calendar] Token loaded successfully")
+            print(f"[Calendar] Calendar ID: {GOOGLE_CALENDAR_ID}")
+            print("[Calendar] Initialization successful")
             return creds
 
         if creds and creds.expired and creds.refresh_token:
             try:
                 creds.refresh(Request())
                 _save_token(creds, token_file)
+                print("[Calendar] Auth Mode: OAuth")
+                print("[Calendar] Token refreshed and loaded successfully")
+                print(f"[Calendar] Calendar ID: {GOOGLE_CALENDAR_ID}")
+                print("[Calendar] Initialization successful")
                 return creds
             except Exception as e:
                 raise CalendarNotConfiguredError(
                     f"OAuth2 token refresh failed: {e}. Run the auth flow again."
                 )
 
-        # No credentials found at all
+        # ── Mode 3: Not Configured ───────────────────────────────────────────
         if not os.path.exists(secrets_file):
             raise CalendarNotConfiguredError(
                 "No Google Calendar credentials found. "
