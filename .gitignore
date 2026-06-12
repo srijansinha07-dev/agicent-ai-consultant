@@ -23,11 +23,9 @@ backend/*.pyc
 backend/venv/
 backend/.venv/
 
-# =========================
-# CHROMA DATABASE
-# =========================
-
 backend/chroma_db/
+*.db
+test_temp.db
 
 # =========================
 # RUNTIME DATA
@@ -66,3 +64,10 @@ backend/data/calendar_credentials.json
 backend/data/calendar_token.json
 .env
 .env.local
+__pycache__/
+*.pyc
+# Test databases
+*.db
+
+# Python cache everywhere
+**/__pycache__/
