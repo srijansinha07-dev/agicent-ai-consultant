@@ -67,9 +67,27 @@ async def startup():
         print(f"❌ POSTGRES DATABASE ERROR: {e}")
 
     # ── Ensure website knowledge base exists ───────────
-
-
-
+    try:
+        import chromadb
+        from chromadb.config import Settings
+        from config import CHROMA_PATH
+        
+        print(f"🔍 [STARTUP CHECK] Opening ChromaDB at exact path: {CHROMA_PATH}")
+        
+        client = chromadb.PersistentClient(
+            path=CHROMA_PATH,
+            settings=Settings(anonymized_telemetry=False),
+        )
+        
+        collections = client.list_collections()
+        print(f"📊 [STARTUP CHECK] Found {len(collections)} collections")
+        
+        for c in collections:
+            count = c.count()
+            print(f"   - Collection: '{c.name}' | count: {count}")
+            
+    except Exception as e:
+        print(f"❌ [STARTUP CHECK] ChromaDB Error: {e}")
 # ── Routes ──────────────────────────────────────────────
 
 # ── Routes ──────────────────────────────────────────────

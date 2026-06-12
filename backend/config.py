@@ -11,8 +11,15 @@ load_dotenv()
 BASE_DIR      = Path(__file__).parent
 UPLOAD_DIR    = BASE_DIR / "uploads"
 
-# Support Railway volume mount at /app/chroma_db
-if os.path.exists("/app/chroma_db"):
+# Auto-detect where the actual uploaded chroma database resides.
+# If a volume upload nested the folder, it might be in /app/chroma_db/chroma_db
+if os.path.exists("/app/chroma_db/chroma.sqlite3"):
+    CHROMA_DIR = Path("/app/chroma_db")
+elif os.path.exists("/app/chroma_db/chroma_db/chroma.sqlite3"):
+    CHROMA_DIR = Path("/app/chroma_db/chroma_db")
+elif os.path.exists(BASE_DIR / "chroma_db" / "chroma.sqlite3"):
+    CHROMA_DIR = BASE_DIR / "chroma_db"
+elif os.path.exists("/app/chroma_db"):
     CHROMA_DIR = Path("/app/chroma_db")
 else:
     CHROMA_DIR = Path(os.getenv("CHROMA_PATH_DIR", BASE_DIR / "chroma_db"))
