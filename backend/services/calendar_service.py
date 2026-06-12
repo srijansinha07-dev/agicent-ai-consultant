@@ -209,9 +209,15 @@ class GoogleCalendarService:
         2. GOOGLE_CLIENT_SECRETS_FILE + GOOGLE_OAUTH_TOKEN_FILE (OAuth2)
 
         """
-        print("GOOGLE_CALENDAR_CREDENTIALS_JSON exists:", bool(GOOGLE_CALENDAR_CREDENTIALS_JSON))
-        print("GOOGLE_OAUTH_CREDENTIALS_JSON exists:", bool(os.getenv("GOOGLE_OAUTH_CREDENTIALS_JSON")))
-        print("GOOGLE_OAUTH_TOKEN_JSON exists:", bool(os.getenv("GOOGLE_OAUTH_TOKEN_JSON")))
+        import traceback
+        print("[Calendar Debug] entering _load_credentials")
+        
+        oauth_json = os.getenv("GOOGLE_OAUTH_CREDENTIALS_JSON", "")
+        token_json = os.getenv("GOOGLE_OAUTH_TOKEN_JSON", "")
+        
+        print(f"[Calendar Debug] oauth_len={len(oauth_json)}")
+        print(f"[Calendar Debug] token_len={len(token_json)}")
+        
         from google.oauth2 import service_account
         from google.auth.transport.requests import Request
         from google.oauth2.credentials import Credentials
@@ -219,31 +225,34 @@ class GoogleCalendarService:
         SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
         # ── Mode 1: Production (OAuth via Env Vars) ───────────────────────────
-        oauth_json = os.getenv("GOOGLE_OAUTH_CREDENTIALS_JSON", "")
-        token_json = os.getenv("GOOGLE_OAUTH_TOKEN_JSON", "")
-
         if token_json:
+            print("[Calendar Debug] using OAuth env mode")
             try:
                 raw_token = base64.b64decode(token_json).decode()
+                print("[Calendar Debug] token decoded successfully")
+                
                 creds_info = json.loads(raw_token)
                 creds = Credentials.from_authorized_user_info(creds_info, SCOPES)
+                print("[Calendar Debug] credentials created successfully")
                 
                 if creds and creds.valid:
                     print("[Calendar] Auth Mode: OAuth (Env)")
                     print("[Calendar] Token loaded successfully")
                     print(f"[Calendar] Calendar ID: {GOOGLE_CALENDAR_ID}")
-                    print("[Calendar] Initialization successful")
+                    print("[Calendar Debug] calendar initialized")
                     return creds
 
                 if creds and creds.expired and creds.refresh_token:
                     creds.refresh(Request())
+                    print("[Calendar Debug] refresh successful")
                     print("[Calendar] Auth Mode: OAuth (Env)")
                     print("[Calendar] Token refreshed and loaded successfully")
                     print(f"[Calendar] Calendar ID: {GOOGLE_CALENDAR_ID}")
-                    print("[Calendar] Initialization successful")
+                    print("[Calendar Debug] calendar initialized")
                     return creds
 
             except Exception as e:
+                print(f"[Calendar Debug] Exception in OAuth env mode:\n{traceback.format_exc()}")
                 print(f"[Calendar] Failed loading OAuth from env vars: {e}")
                 raise CalendarNotConfiguredError(
                     f"Failed to load OAuth token from env vars: {e}"
