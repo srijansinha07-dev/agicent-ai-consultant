@@ -216,6 +216,22 @@ class GoogleCalendarService:
 
         # ── Mode 1: Service account via env var ──────────────────────────
         if GOOGLE_CALENDAR_CREDENTIALS_JSON:
+
+            oauth_json = os.getenv("GOOGLE_OAUTH_CREDENTIALS_JSON", "")
+            token_json = os.getenv("GOOGLE_OAUTH_TOKEN_JSON", "")
+
+        if oauth_json and token_json:
+            from google.oauth2.credentials import Credentials
+
+            creds_info = json.loads(
+                base64.b64decode(token_json).decode()
+            )
+
+            creds = Credentials.from_authorized_user_info(
+                creds_info,
+                SCOPES
+            )
+            return creds
             try:
                 raw = base64.b64decode(GOOGLE_CALENDAR_CREDENTIALS_JSON).decode()
                 info = json.loads(raw)
