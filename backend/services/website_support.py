@@ -342,33 +342,28 @@ def _normalize_title(raw: str) -> str:
 
 
 WEBSITE_SUPPORT_RULES = (
-    "You are the Agicent AI Consultant — a Senior Product Consultant, Technology Strategist, "
-    "and Agicent representative (agicent.com). You speak FOR Agicent, not as a generic AI.\n\n"
-    "PERSPECTIVE (required):\n"
-    "- Answer from Agicent's viewpoint, but vary sentence openings naturally.\n"
+    "You are Agicent's AI Consultant — a knowledgeable AI representative of Agicent (agicent.com).\n"
+    "You are NOT a human consultant. Do not claim personal experience, personal opinions, or human identity.\n\n"
+    "IDENTITY:\n"
+    "- You represent Agicent as an AI system.\n"
+    "- Use: 'Based on Agicent\'s experience...', 'Agicent typically approaches...', 'According to Agicent\'s process...'\n"
+    "- Never say: 'I personally recommend', 'I have worked on', 'As a senior consultant', 'I can confirm from experience'\n\n"
+    "PERSPECTIVE:\n"
+    "- Answer from Agicent's viewpoint. Vary sentence openings naturally.\n"
     "- Do not mechanically start replies with 'At Agicent...'.\n"
     "- Prioritize Agicent methodology, services, case studies, and delivery models from CONTEXT.\n"
-    "- Generic industry advice is only a brief fallback when context lacks detail.\n"
-    "- The user asks: 'How would Agicent approach this?' — not textbook theory.\n\n"
+    "- Generic industry advice is only a brief fallback when context lacks detail.\n\n"
     "TRUTH:\n"
     "- Use ONLY retrieved CONTEXT as primary truth. Do not invent pricing, timelines, or capabilities.\n"
-    "- If context is insufficient, say what Agicent can confirm and suggest speaking with our experts.\n\n"
-    "STYLE & LENGTH:\n"
-    "- Aim for 150–250 words; shorter is fine if the answer is clear.\n"
-    "- Avoid promotional language and \"about Agicent\" marketing copy.\n"
-    "- Do NOT use phrases like: cutting-edge AI technology, innovative solutions, AI experts, bespoke development, end-to-end services.\n\n"
-    "ANSWER SHAPE (flexible):\n"
-    "- Choose a format that matches the question type.\n"
-    "- For MVP or strategy questions, focus on Agicent's methodology, tradeoffs, and sequencing.\n"
-    "- For cost or team questions, outline assumptions, ranges, and engagement models rather than slogans.\n"
-    "- For technology-choice questions, provide recommendation, rationale, and tradeoffs.\n"
-    "- Use short headings or bullets only when they make the reasoning clearer — never just to fill a template.\n\n"
-    "CONVERSATIONAL HANDLING:\n"
-    "- If the user message is only a greeting or acknowledgement, respond briefly and naturally (1-2 lines), "
-    "then offer help; do not give a long consulting answer.\n\n"
+    "- If context is insufficient, say what Agicent can confirm and suggest speaking with the team.\n\n"
+    "RESPONSE DISCIPLINE:\n"
+    "- Answer the user's actual question directly. Do not pad with sales copy.\n"
+    "- Aim for 120-220 words. Shorter is better when the answer is clear.\n"
+    "- Avoid: cutting-edge, innovative solutions, bespoke development, end-to-end services, industry-leading.\n"
+    "- Use headings or bullets only when they genuinely improve readability.\n\n"
     "TONE:\n"
-    "- Sound like a senior consultant thinking through the problem step by step.\n"
-    "- Emphasise recommendations, implementation approach, and practical next steps over generic benefits."
+    "- Professional, direct, and helpful. Think through the problem before answering.\n"
+    "- Emphasise practical approach and next steps over generic benefits."
 )
 
 
@@ -376,71 +371,101 @@ WEBSITE_SUPPORT_RULES = (
 # Used by the new consultant_agent.py to save tokens on every request.
 # Behaviorally equivalent to WEBSITE_SUPPORT_RULES but dramatically shorter.
 CONSULTANT_PROMPT_COMPRESSED = (
-    "You are the Agicent AI Consultant. Speak as a senior Agicent solutions consultant.\n"
-    "Rules: Use ONLY retrieved CONTEXT. No invented pricing/timelines. "
-    "Be concise (120-220 words). No marketing clichés. "
-    "Recommend Agicent's approach, methodology, and delivery model. "
-    "If context is thin, say what Agicent can confirm and suggest a discovery call."
+    "You are Agicent's AI Consultant (agicent.com). NOT a human.\n"
+    "VOICE: Use 'we'/'our' for Agicent. Use 'I' for yourself. Never say 'Agicent typically', 'According to Agicent', 'They'.\n"
+    "LANGUAGE: Never expose: 'context', 'retrieval', 'knowledge-base', 'prompt', 'model'. Speak naturally.\n"
+    "RULES:\n"
+    "- Answer the user's question first. No preamble. No company background unless asked.\n"
+    "- Use known project context to personalise answers. Do not repeat facts already established.\n"
+    "- When user describes a project: acknowledge, identify the key unknown, ask ONE focused question.\n"
+    "- Only suggest a consultation when discussing implementation, budget, timelines, or project feasibility.\n"
+    "- Be concise (100-150 words). Use bullet points for lists."
 )
 
 
 # ── Discovery question templates (zero LLM, deterministic) ────────────────
 # One question per missing discovery field. Keep them conversational.
+# ── Discovery question banks (contextual, not rigid templates) ────────────
+# Each field has multiple variants so the question can be chosen based on
+# what the user has already said. consultant_agent picks the most relevant.
 DISCOVERY_QUESTIONS: dict[str, str] = {
-    "industry": (
-        "What industry or vertical is this for? "
-        "(e.g. healthcare, fintech, edtech, SaaS, logistics…)"
-    ),
-    "project_type": (
-        "Are you starting fresh with an MVP, scaling an existing product, "
-        "or modernising something already in production?"
-    ),
-    "target_users": (
-        "Who are the primary users? "
-        "(e.g. consumers, enterprise teams, patients, developers…)"
-    ),
-    "timeline": (
-        "What's the timeline you're working with? "
-        "Is there a specific launch date, or is it more exploratory right now?"
-    ),
-    "budget": (
-        "Do you have a rough budget in mind? Even a ballpark helps us suggest "
-        "the right team model and scope."
-    ),
-    "company_stage": (
-        "What stage is your company or project at? "
-        "(pre-seed, seed, Series A, growth, or enterprise?)"
-    ),
+    # Default (fallback) questions per field — used when no context available
+    "industry": "What industry or vertical is this project for?",
+    "project_type": "Are you starting fresh, scaling an existing product, or modernising something already in production?",
+    "target_users": "Who are the primary users of this product?",
+    "timeline": "What timeline are you working with? Is there a specific launch target?",
+    "budget": "Do you have a rough budget in mind? Even a ballpark helps narrow down the right team model.",
+    "company_stage": "What stage is your company at — early-stage, growth, or enterprise?",
+}
+
+# Per-field contextual question variants keyed by known context.
+# Format: { field: { context_key: question_text } }
+DISCOVERY_QUESTION_VARIANTS: dict[str, dict[str, str]] = {
+    "project_type": {
+        "healthcare": "Is this a new platform, an upgrade to an existing system, or integration with existing clinical tools?",
+        "fintech": "Are you building a new product, adding features to an existing one, or doing a compliance/modernisation project?",
+        "edtech": "Are you starting with an MVP, or do you have an existing platform you're looking to scale?",
+        "ecommerce": "Are you building a new storefront, scaling your current platform, or adding capabilities like AI recommendations?",
+        "saas": "Are you launching a new SaaS, scaling the current product, or modernising the architecture?",
+        "startup": "Are you at the idea/MVP stage, or do you have an early product looking to scale?",
+    },
+    "target_users": {
+        "healthcare": "Who will use the platform — patients, clinicians, hospital admins, or all three?",
+        "fintech": "Is this aimed at retail consumers, business clients, or financial institutions?",
+        "edtech": "Is this for students, educators, institutions, or a mix?",
+        "ecommerce": "Is this B2C, B2B, or a marketplace model?",
+        "saas": "Who's the primary buyer — individual users, teams, or enterprise?",
+    },
+    "timeline": {
+        "mvp": "What's the target launch for the MVP — are we talking weeks or months?",
+        "scaling": "What's driving the timeline? Is there a specific growth milestone or product deadline?",
+        "mobile_app": "Do you have a hard launch date in mind, or is the timeline flexible?",
+    },
+    "budget": {
+        "startup": "Do you have a budget range for the initial build? It helps us suggest the right scope.",
+        "enterprise": "What's the approximate project budget or engagement budget you're working with?",
+        "mvp": "For the MVP phase, what budget range are you working with? Even a rough estimate is helpful.",
+    },
 }
 
 
 # ── Domain guardrail response ──────────────────────────────────────────────
 DOMAIN_REDIRECT_MESSAGE = (
-    "That's outside my area — I'm specialised in software development, "
-    "AI solutions, product strategy, and digital transformation. "
-    "Happy to help if you have a project or tech question in mind."
+    "That's outside what I can help with — my focus is software development, "
+    "AI products, product strategy, and digital transformation. "
+    "If you have a project or technology question, I'm happy to dig into it."
 )
 
 
 # ── Consultation offer templates ────────────────────────────────────────────
 CONSULTATION_OFFER_MESSAGES = {
     "default": (
-        "Based on what you've shared, this sounds like a strong fit for a focused "
-        "discovery session with the Agicent team. We could map out the right scope, "
-        "team model, and delivery approach in about 45 minutes.\n\n"
-        "Would you like to schedule a consultation?"
+        "Based on what you've shared, this looks like a good fit for a focused discovery session. "
+        "Agicent typically uses a 45-minute call to align on scope, team model, and delivery approach "
+        "before moving forward.\n\n"
+        "Would you like to schedule one?"
     ),
     "high_budget": (
-        "With the budget and timeline you've outlined, this is exactly the kind of "
-        "engagement we do well. I'd recommend a discovery call to nail down scope "
-        "and match you with the right team structure.\n\n"
+        "With the budget and timeline you've described, Agicent can move quickly. "
+        "A discovery call would help nail down the right scope and team structure for your situation.\n\n"
         "Want to set up a 45-minute session?"
     ),
     "mvp": (
-        "You've given me enough context to see a clear path here. "
-        "The next best step is a discovery session where we can define the MVP scope, "
-        "prioritise features, and sketch a realistic delivery plan.\n\n"
-        "Shall I help you book a consultation with Agicent?"
+        "There's enough context here to start planning. "
+        "Agicent's typical next step would be a discovery session to define the MVP scope, "
+        "prioritise features, and sketch a delivery plan.\n\n"
+        "Would you like to book a consultation?"
+    ),
+    "healthcare": (
+        "Healthcare projects involve compliance, data security, and integration considerations "
+        "that are best discussed in a focused session. "
+        "Agicent has worked on HIPAA-compliant platforms and telemedicine products.\n\n"
+        "Would you like to schedule a discovery call?"
+    ),
+    "fintech": (
+        "Fintech projects typically involve regulatory, security, and integration complexity "
+        "worth discussing directly. Agicent has delivered payment platforms and financial tools.\n\n"
+        "Shall we set up a discovery session?"
     ),
 }
 
@@ -448,9 +473,16 @@ CONSULTATION_OFFER_MESSAGES = {
 def get_consultation_offer_message(state: "object") -> str:
     """Pick the most contextually appropriate consultation offer message."""
     try:
-        if getattr(state, "budget", None) and getattr(state, "timeline", None):
+        industry = getattr(state, "budget", None) and getattr(state, "timeline", None)
+        if industry:
             return CONSULTATION_OFFER_MESSAGES["high_budget"]
-        if getattr(state, "project_type", None) in ("mvp", "prototype", "poc"):
+        proj_type = getattr(state, "project_type", None)
+        ind = getattr(state, "industry", None)
+        if ind == "healthcare":
+            return CONSULTATION_OFFER_MESSAGES["healthcare"]
+        if ind == "fintech":
+            return CONSULTATION_OFFER_MESSAGES["fintech"]
+        if proj_type in ("mvp", "prototype", "poc"):
             return CONSULTATION_OFFER_MESSAGES["mvp"]
     except Exception:
         pass

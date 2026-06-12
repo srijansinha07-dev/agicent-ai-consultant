@@ -58,6 +58,13 @@ async def startup():
 
     except Exception as e:
         print(f"❌ DOCSTORE ERROR: {e}")
+        
+    try:
+        from database import init_db
+        init_db()
+        print("✅ POSTGRES DATABASE INITIALIZED")
+    except Exception as e:
+        print(f"❌ POSTGRES DATABASE ERROR: {e}")
 
     # ── Ensure website knowledge base exists ───────────
 

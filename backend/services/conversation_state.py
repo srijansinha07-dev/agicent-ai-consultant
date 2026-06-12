@@ -197,6 +197,7 @@ class ConversationState:
     booking_status:         Optional[str]  = None   # None | "offered" | "collecting" | "booked"
     meeting_time:           Optional[str]  = None
     user_email:             Optional[str]  = None
+    active_booking:         Optional[dict] = None   # Lightweight injected booking metadata
 
     # ── Memory ───────────────────────────────────────────────────
     conversation_summary: str              = ""
@@ -267,17 +268,33 @@ class ConversationState:
 
     def to_context_snippet(self) -> str:
         """Build a compact context string for LLM prompts (~80 tokens max)."""
-        parts = []
-        if self.industry:       parts.append(f"Industry: {self.industry}")
-        if self.project_type:   parts.append(f"Project: {self.project_type}")
-        if self.target_users:   parts.append(f"Users: {self.target_users}")
-        if self.budget:         parts.append(f"Budget: {self.budget}")
-        if self.timeline:       parts.append(f"Timeline: {self.timeline}")
-        if self.company_stage:  parts.append(f"Stage: {self.company_stage}")
-        if self.requirements:   parts.append(f"Needs: {'; '.join(self.requirements[:3])}")
+        project_parts = []
+        if self.industry:       project_parts.append(f"Industry: {self.industry}")
+        if self.project_type:   project_parts.append(f"Project: {self.project_type}")
+        if self.target_users:   project_parts.append(f"Users: {self.target_users}")
+        if self.budget:         project_parts.append(f"Budget: {self.budget}")
+        if self.timeline:       project_parts.append(f"Timeline: {self.timeline}")
+        if self.company_stage:  project_parts.append(f"Stage: {self.company_stage}")
+        if self.requirements:   project_parts.append(f"Needs: {'; '.join(self.requirements[:3])}")
         if self.conversation_summary:
-            parts.append(f"Summary: {self.conversation_summary}")
-        return " | ".join(parts) if parts else ""
+            project_parts.append(f"Summary: {self.conversation_summary}")
+
+        sections = []
+        if project_parts:
+            sections.append("[PROJECT] " + " | ".join(project_parts))
+
+        if self.active_booking:
+            b = self.active_booking
+            booking_lines = []
+            if b.get("date"):       booking_lines.append(f"Date: {b['date']}")
+            if b.get("time"):       booking_lines.append(f"Time: {b['time']}")
+            if b.get("consultant"): booking_lines.append(f"Consultant: {b['consultant']}")
+            if b.get("meet_link"):  booking_lines.append(f"Google Meet: {b['meet_link']}")
+            if b.get("status"):     booking_lines.append(f"Status: {b['status']}")
+            if booking_lines:
+                sections.append("[ACTIVE BOOKING] " + " | ".join(booking_lines))
+
+        return "\n".join(sections) if sections else ""
 
 
 # ── In-memory store with TTL ───────────────────────────────────────────────

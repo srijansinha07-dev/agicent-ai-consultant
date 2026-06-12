@@ -107,10 +107,11 @@ class CalendarBookingError(Exception):
 # ── Data types ─────────────────────────────────────────────────────────────
 
 class CalendarSlot:
-    def __init__(self, start: datetime, end: datetime):
-        self.start   = start
-        self.end     = end
-        self.display = self._fmt()
+    def __init__(self, start: datetime, end: datetime, remaining_capacity: int = 0):
+        self.start              = start
+        self.end                = end
+        self.display            = self._fmt()
+        self.remaining_capacity = remaining_capacity
 
     def _fmt(self) -> str:
         tz = ZoneInfo(MEETING_TIMEZONE)
@@ -128,6 +129,7 @@ class CalendarSlot:
             "start":   self.start.isoformat(),
             "end":     self.end.isoformat(),
             "display": self.display,
+            "remaining_capacity": self.remaining_capacity,
         }
 
 
@@ -371,14 +373,17 @@ class GoogleCalendarService:
         available = []
 
         for slot in slots:
-            # Check if at least one active consultant is available
+            available_consultants_count = 0
+            # Check how many active consultants are available
             for consultant in active_consultants:
                 consultant_busy = []
                 if consultant.calendar_id and consultant.calendar_id != shared_cal_id:
                     consultant_busy = busy_map.get(consultant.calendar_id, [])
                 if _is_consultant_available(consultant, slot.start, slot.end, consultant_busy):
-                    available.append(slot)
-                    break  # This slot is available, move to the next candidate slot
+                    available_consultants_count += 1
+            
+            slot.remaining_capacity = available_consultants_count
+            available.append(slot)
 
         return [s.to_dict() for s in available]
 

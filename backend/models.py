@@ -56,6 +56,7 @@ class ChatRequest(BaseModel):
     query:      str
     history:    list[dict] = []
     session_id: Optional[str] = None  # used by consultant agent for stateful memory
+    booking_state: Optional[dict] = None  # optional active booking details from frontend
 
 class Source(BaseModel):
     doc_id:      str
@@ -153,6 +154,7 @@ class ConsultantWorkingHours(BaseModel):
     start: str  # "HH:MM" e.g., "10:00"
     end: str    # "HH:MM" e.g., "18:00"
     days: list[int]  # [0, 1, 2, 3, 4] for Mon-Fri
+    timezone: Optional[str] = None  # IANA timezone, e.g. "Asia/Kolkata"
 
 class ConsultantLeave(BaseModel):
     start: str  # ISO datetime string

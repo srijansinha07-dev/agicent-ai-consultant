@@ -142,27 +142,6 @@ def _heuristic_project_summary(conversation_history: list[ConsultationConversati
 
     return "\n".join([f"- {i}" for i in deduped[:6]])
 
-
-def _load_all_requests() -> list[dict]:
-    if not CONSULTATIONS_FILE.exists():
-        return []
-    try:
-        return json.loads(CONSULTATIONS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return []
-
-
-def _save_all_requests(records: list[dict]) -> None:
-    lock_path = str(CONSULTATIONS_FILE) + ".lock"
-    file_lock = FileLock(lock_path, timeout=5)
-
-    with file_lock:
-        tmp_path = str(CONSULTATIONS_FILE) + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(records, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_path, str(CONSULTATIONS_FILE))
-
-
 def forward_consultation_if_configured(payload: dict) -> None:
     if not CONSULTATION_FORWARD_URL:
         return
@@ -212,9 +191,30 @@ def create_consultation_request(
         "conversation_history": [item.model_dump() for item in conversation_history or []],
     }
 
-    all_requests = _load_all_requests()
-    all_requests.append(record)
-    _save_all_requests(all_requests)
+    from database import SessionLocal, DBConsultation
+    db = SessionLocal()
+    try:
+        db_consultation = DBConsultation(
+            consultation_id=record["consultation_id"],
+            created_at=record["created_at"],
+            user_id=record["user_id"],
+            session_id=record["session_id"],
+            name=record["name"],
+            email=record["email"],
+            company=record["company"],
+            project_description=record["project_description"],
+            budget=record["budget"],
+            timeline=record["timeline"],
+            project_summary=record["project_summary"],
+            conversation_history=record["conversation_history"]
+        )
+        db.add(db_consultation)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Error saving consultation: {e}")
+    finally:
+        db.close()
 
     forward_consultation_if_configured(record | {"project_summary": summary})
 
@@ -222,8 +222,31 @@ def create_consultation_request(
 
 
 def list_consultations(*, user_id: str | None = None) -> list[dict]:
-    records = _load_all_requests()
-    if user_id:
-        return [r for r in records if r.get("user_id") == user_id]
-    return records
+    from database import SessionLocal, DBConsultation
+    db = SessionLocal()
+    try:
+        query = db.query(DBConsultation)
+        if user_id:
+            query = query.filter(DBConsultation.user_id == user_id)
+        
+        records = query.all()
+        result = []
+        for r in records:
+            result.append({
+                "consultation_id": r.consultation_id,
+                "created_at": r.created_at,
+                "user_id": r.user_id,
+                "session_id": r.session_id,
+                "name": r.name,
+                "email": r.email,
+                "company": r.company,
+                "project_description": r.project_description,
+                "budget": r.budget,
+                "timeline": r.timeline,
+                "project_summary": r.project_summary,
+                "conversation_history": r.conversation_history
+            })
+        return result
+    finally:
+        db.close()
 

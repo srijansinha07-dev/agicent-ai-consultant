@@ -193,5 +193,199 @@ class JSONConsultantRepository(ConsultantRepository):
         return False
 
 
+class PostgresConsultantRepository(ConsultantRepository):
+    """
+    PostgreSQL implementation of the ConsultantRepository using SQLAlchemy.
+    """
+    
+    def __init__(self):
+        # We rely on the migration script in database.py to handle seeding.
+        # But just in case, we could call a similar ensure_seeded here.
+        self._ensure_seeded()
+
+    def _ensure_seeded(self):
+        from database import SessionLocal, DBConsultant
+        from models import ConsultantWorkingHours
+        from config import GOOGLE_CALENDAR_ID
+        
+        db = SessionLocal()
+        try:
+            count = db.query(DBConsultant).count()
+            if count == 0 or (count == 1 and db.query(DBConsultant).first().id == "default_consultant"):
+                # Seed default consultants
+                default_hours = ConsultantWorkingHours(
+                    start="10:00",
+                    end="19:00",
+                    days=[0, 1, 2, 3, 4]
+                )
+                default_cal_id = GOOGLE_CALENDAR_ID or "primary"
+                
+                db.query(DBConsultant).filter(DBConsultant.id == "default_consultant").delete()
+                
+                c1 = DBConsultant(
+                    id="primary_consultant",
+                    name="Primary Consultant",
+                    email="consultant@agicent.com",
+                    active=True,
+                    calendar_id=default_cal_id,
+                    working_hours=default_hours.model_dump(),
+                    leaves=[],
+                    unavailabilities=[]
+                )
+                c2 = DBConsultant(
+                    id="business_consultant",
+                    name="Business Consultant",
+                    email="business@agicent.com",
+                    active=True,
+                    calendar_id=default_cal_id,
+                    working_hours=default_hours.model_dump(),
+                    leaves=[],
+                    unavailabilities=[]
+                )
+                c3 = DBConsultant(
+                    id="technical_consultant",
+                    name="Technical Consultant",
+                    email="tech@agicent.com",
+                    active=True,
+                    calendar_id=default_cal_id,
+                    working_hours=default_hours.model_dump(),
+                    leaves=[],
+                    unavailabilities=[]
+                )
+                db.add_all([c1, c2, c3])
+                db.commit()
+        except Exception as e:
+            print(f"[PostgresConsultantRepo] Error seeding: {e}")
+            db.rollback()
+        finally:
+            db.close()
+
+    def _to_model(self, db_consultant) -> Consultant:
+        from models import ConsultantWorkingHours, ConsultantLeave, ConsultantUnavailability
+        return Consultant(
+            id=db_consultant.id,
+            name=db_consultant.name,
+            email=db_consultant.email,
+            active=db_consultant.active,
+            calendar_id=db_consultant.calendar_id,
+            working_hours=ConsultantWorkingHours.model_validate(db_consultant.working_hours),
+            leaves=[ConsultantLeave.model_validate(l) for l in (db_consultant.leaves or [])],
+            unavailabilities=[ConsultantUnavailability.model_validate(u) for u in (db_consultant.unavailabilities or [])]
+        )
+
+    def list_all(self) -> list[Consultant]:
+        from database import SessionLocal, DBConsultant
+        db = SessionLocal()
+        try:
+            records = db.query(DBConsultant).all()
+            valid_consultants = []
+            for record in records:
+                try:
+                    c = self._to_model(record)
+                    cal_id = c.calendar_id
+                    
+                    if not cal_id or not cal_id.strip():
+                        print(f"[ConsultantRepo] WARNING: Rejecting consultant '{c.name}' ({c.id}) due to missing calendar_id.")
+                        continue
+                        
+                    cal_id_clean = cal_id.strip().lower()
+                    if cal_id_clean in ("c1", "c2", "c3", "test", "test_c", "placeholder"):
+                        print(f"[ConsultantRepo] WARNING: Rejecting consultant '{c.name}' ({c.id}) due to placeholder/test calendar_id '{cal_id}'.")
+                        continue
+                        
+                    if cal_id_clean != "primary" and "@" not in cal_id_clean:
+                        print(f"[ConsultantRepo] WARNING: Rejecting consultant '{c.name}' ({c.id}) due to invalid calendar_id format '{cal_id}'.")
+                        continue
+                        
+                    valid_consultants.append(c)
+                except Exception as e:
+                    print(f"[ConsultantRepo] WARNING: Failed to validate consultant record {record.id}: {e}")
+                    continue
+            return valid_consultants
+        except Exception as e:
+            print(f"[PostgresConsultantRepo] Error loading: {e}")
+            return []
+        finally:
+            db.close()
+
+    def get_by_id(self, consultant_id: str) -> Optional[Consultant]:
+        from database import SessionLocal, DBConsultant
+        db = SessionLocal()
+        try:
+            record = db.query(DBConsultant).filter(DBConsultant.id == consultant_id).first()
+            if record:
+                return self._to_model(record)
+            return None
+        finally:
+            db.close()
+
+    def create(self, consultant: Consultant) -> Consultant:
+        from database import SessionLocal, DBConsultant
+        db = SessionLocal()
+        try:
+            existing = db.query(DBConsultant).filter(DBConsultant.id == consultant.id).first()
+            if existing:
+                raise ValueError(f"Consultant with ID {consultant.id} already exists.")
+            
+            db_consultant = DBConsultant(
+                id=consultant.id,
+                name=consultant.name,
+                email=consultant.email,
+                active=consultant.active,
+                calendar_id=consultant.calendar_id,
+                working_hours=consultant.working_hours.model_dump(),
+                leaves=[l.model_dump() for l in consultant.leaves],
+                unavailabilities=[u.model_dump() for u in consultant.unavailabilities]
+            )
+            db.add(db_consultant)
+            db.commit()
+            return consultant
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+    def update(self, consultant_id: str, consultant: Consultant) -> Optional[Consultant]:
+        from database import SessionLocal, DBConsultant
+        db = SessionLocal()
+        try:
+            record = db.query(DBConsultant).filter(DBConsultant.id == consultant_id).first()
+            if not record:
+                return None
+            
+            record.name = consultant.name
+            record.email = consultant.email
+            record.active = consultant.active
+            record.calendar_id = consultant.calendar_id
+            record.working_hours = consultant.working_hours.model_dump()
+            record.leaves = [l.model_dump() for l in consultant.leaves]
+            record.unavailabilities = [u.model_dump() for u in consultant.unavailabilities]
+            
+            db.commit()
+            return consultant
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+    def delete(self, consultant_id: str) -> bool:
+        from database import SessionLocal, DBConsultant
+        db = SessionLocal()
+        try:
+            record = db.query(DBConsultant).filter(DBConsultant.id == consultant_id).first()
+            if not record:
+                return False
+            db.delete(record)
+            db.commit()
+            return True
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+
 # Canonical repository instance to be used across the app
-consultant_repo: ConsultantRepository = JSONConsultantRepository()
+consultant_repo: ConsultantRepository = PostgresConsultantRepository()

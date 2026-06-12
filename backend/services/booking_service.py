@@ -112,5 +112,131 @@ class JSONBookingRepository(BookingRepository):
         return False
 
 
+class PostgresBookingRepository(BookingRepository):
+    """
+    PostgreSQL implementation of the BookingRepository using SQLAlchemy.
+    """
+    
+    def _to_model(self, db_booking) -> Booking:
+        return Booking(
+            booking_id=db_booking.booking_id,
+            consultant_id=db_booking.consultant_id,
+            attendee_name=db_booking.attendee_name,
+            attendee_email=db_booking.attendee_email,
+            company=db_booking.company,
+            topic_summary=db_booking.topic_summary,
+            start_iso=db_booking.start_iso,
+            end_iso=db_booking.end_iso,
+            event_id=db_booking.event_id,
+            html_link=db_booking.html_link,
+            attendee_link=db_booking.attendee_link,
+            meet_link=db_booking.meet_link,
+            status=db_booking.status,
+            created_at=db_booking.created_at
+        )
+
+    def list_all(self) -> list[Booking]:
+        from database import SessionLocal, DBBooking
+        db = SessionLocal()
+        try:
+            records = db.query(DBBooking).all()
+            return [self._to_model(r) for r in records]
+        except Exception as e:
+            print(f"[PostgresBookingRepo] Error loading: {e}")
+            return []
+        finally:
+            db.close()
+
+    def get_by_id(self, booking_id: str) -> Optional[Booking]:
+        from database import SessionLocal, DBBooking
+        db = SessionLocal()
+        try:
+            record = db.query(DBBooking).filter(DBBooking.booking_id == booking_id).first()
+            if record:
+                return self._to_model(record)
+            return None
+        finally:
+            db.close()
+
+    def create(self, booking: Booking) -> Booking:
+        from database import SessionLocal, DBBooking
+        db = SessionLocal()
+        try:
+            existing = db.query(DBBooking).filter(DBBooking.booking_id == booking.booking_id).first()
+            if existing:
+                raise ValueError(f"Booking with ID {booking.booking_id} already exists.")
+            
+            db_booking = DBBooking(
+                booking_id=booking.booking_id,
+                consultant_id=booking.consultant_id,
+                attendee_name=booking.attendee_name,
+                attendee_email=booking.attendee_email,
+                company=booking.company,
+                topic_summary=booking.topic_summary,
+                start_iso=booking.start_iso,
+                end_iso=booking.end_iso,
+                event_id=booking.event_id,
+                html_link=booking.html_link,
+                attendee_link=booking.attendee_link,
+                meet_link=booking.meet_link,
+                status=booking.status,
+                created_at=booking.created_at
+            )
+            db.add(db_booking)
+            db.commit()
+            return booking
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+    def update(self, booking_id: str, booking: Booking) -> Optional[Booking]:
+        from database import SessionLocal, DBBooking
+        db = SessionLocal()
+        try:
+            record = db.query(DBBooking).filter(DBBooking.booking_id == booking_id).first()
+            if not record:
+                return None
+            
+            record.consultant_id = booking.consultant_id
+            record.attendee_name = booking.attendee_name
+            record.attendee_email = booking.attendee_email
+            record.company = booking.company
+            record.topic_summary = booking.topic_summary
+            record.start_iso = booking.start_iso
+            record.end_iso = booking.end_iso
+            record.event_id = booking.event_id
+            record.html_link = booking.html_link
+            record.attendee_link = booking.attendee_link
+            record.meet_link = booking.meet_link
+            record.status = booking.status
+            record.created_at = booking.created_at
+            
+            db.commit()
+            return booking
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+    def delete(self, booking_id: str) -> bool:
+        from database import SessionLocal, DBBooking
+        db = SessionLocal()
+        try:
+            record = db.query(DBBooking).filter(DBBooking.booking_id == booking_id).first()
+            if not record:
+                return False
+            db.delete(record)
+            db.commit()
+            return True
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+
 # Canonical repository instance to be used across the app
-booking_repo: BookingRepository = JSONBookingRepository()
+booking_repo: BookingRepository = PostgresBookingRepository()

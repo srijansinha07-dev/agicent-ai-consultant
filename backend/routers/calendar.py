@@ -59,6 +59,9 @@ class BookingResponse(BaseModel):
     start:        Optional[str] = None
     end:          Optional[str] = None
     error:        Optional[str] = None
+    booking_id:   Optional[str] = None
+    consultant_name: Optional[str] = None
+
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
@@ -117,14 +120,17 @@ def _get_next_consultant_round_robin(available_consultants: list[Consultant]) ->
         return available_consultants[0]
 
     # Load round-robin state
-    state_file = BASE_DIR / "data" / "scheduling_state.json"
+    from database import SessionLocal, DBSchedulingState
+    db = SessionLocal()
     last_assigned_id = None
-    if state_file.exists():
-        try:
-            state = json.loads(state_file.read_text(encoding="utf-8"))
-            last_assigned_id = state.get("last_assigned_id")
-        except Exception:
-            pass
+    try:
+        state_record = db.query(DBSchedulingState).first()
+        if state_record:
+            last_assigned_id = state_record.last_assigned_id
+    except Exception:
+        pass
+    finally:
+        db.close()
 
     # Find the index of the last assigned consultant
     last_idx = -1
@@ -147,15 +153,20 @@ def _get_next_consultant_round_robin(available_consultants: list[Consultant]) ->
         chosen = available_consultants[0]
 
     # Save state
-    lock_path = str(state_file) + ".lock"
-    file_lock = FileLock(lock_path, timeout=5)
-    with file_lock:
-        try:
-            state_file.parent.mkdir(exist_ok=True)
-            with open(state_file, "w", encoding="utf-8") as f:
-                json.dump({"last_assigned_id": chosen.id}, f, indent=2)
-        except Exception as e:
-            print(f"[RoundRobin] Failed to save state: {e}")
+    db = SessionLocal()
+    try:
+        state_record = db.query(DBSchedulingState).first()
+        if not state_record:
+            state_record = DBSchedulingState(last_assigned_id=chosen.id)
+            db.add(state_record)
+        else:
+            state_record.last_assigned_id = chosen.id
+        db.commit()
+    except Exception as e:
+        print(f"[RoundRobin] Failed to save state: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
     return chosen
 
@@ -237,8 +248,38 @@ async def book_slot(req: BookingRequest):
             summary      = event.summary,
             start        = event.start,
             end          = event.end,
+            booking_id   = booking_id,
+            consultant_name = assigned_consultant.name,
         )
 
     except Exception as e:
         return BookingResponse(ok=False, error=str(e))
+
+
+@router.post("/bookings/{id}/cancel")
+async def cancel_booking(id: str):
+    """
+    Cancel an existing booking, delete Google Calendar event, and update DB.
+    Does not require admin token since it's used directly in the reschedule/cancel flow by attendees.
+    """
+    booking = booking_repo.get_by_id(id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+
+    if booking.status == "cancelled":
+        return {"ok": True, "message": "Booking is already cancelled."}
+
+    # Delete calendar event from the dedicated Discovery Calls calendar
+    try:
+        from services.calendar_service import GoogleCalendarService
+        cal_svc = GoogleCalendarService()
+        booking_cal_id = cal_svc.get_booking_calendar_id()
+        cal_svc.delete_event(booking_cal_id, booking.event_id)
+    except Exception as e:
+        print(f"[CalendarRouter] Event delete failed during cancellation: {e}")
+
+    booking.status = "cancelled"
+    booking_repo.update(id, booking)
+    return {"ok": True}
+
 

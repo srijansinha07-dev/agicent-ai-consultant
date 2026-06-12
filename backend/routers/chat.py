@@ -59,6 +59,7 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
                 chunks_all  = chunks,
                 pages_all   = pages,
                 doc_info    = info,
+                booking_state = req.booking_state,
             )
 
             answer           = result["answer"]

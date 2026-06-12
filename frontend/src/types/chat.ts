@@ -11,6 +11,7 @@ export interface SlotOption {
   start: string   // ISO datetime
   end: string     // ISO datetime
   display: string // human-readable, e.g. "Tuesday, June 10 at 9:00 AM EDT"
+  remaining_capacity?: number
 }
 
 /** Mirrors backend `history: list[dict]` on ChatRequest. */
@@ -20,11 +21,23 @@ export interface ChatHistoryItem {
   [key: string]: unknown
 }
 
+/** Booking state injected by the frontend after a successful booking. */
+export interface BookingState {
+  date?: string
+  time?: string
+  timezone?: string
+  consultant?: string
+  meet_link?: string
+  booking_id?: string
+  status?: string
+}
+
 export interface ChatRequest {
   doc_id: string
   query: string
   history?: ChatHistoryItem[]
   session_id?: string // used by consultant agent for stateful memory
+  booking_state?: BookingState | null
 }
 
 export interface Source {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { env } from '@/config/env'
 import { postChat } from '@/services/api'
-import type { ChatHistoryItem, ChatMessage, ViewMode } from '@/types/chat'
+import type { BookingState, ChatHistoryItem, ChatMessage, ViewMode } from '@/types/chat'
 
 const STORAGE_KEY = 'agicent_chat_messages'
 const SESSION_KEY = 'agicent_chat_session'
@@ -38,6 +38,15 @@ function getOrCreateSessionId(): string {
     return id
   } catch {
     return generateId()
+  }
+}
+
+function getActiveBooking(): BookingState | null {
+  try {
+    const raw = sessionStorage.getItem('agicent_active_booking')
+    return raw ? (JSON.parse(raw) as BookingState) : null
+  } catch {
+    return null
   }
 }
 
@@ -112,6 +121,7 @@ export function useChat(): UseChatReturn {
           doc_id: env.docId,
           query: query.trim(),
           history,
+          booking_state: getActiveBooking(),
         }, env.userId, sessionId)
 
         const intent = computeConsultationIntent(userMessage)

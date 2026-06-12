@@ -5,10 +5,16 @@ Unit tests for multi-consultant availability, leave/vacation filtering, and roun
 Run from backend/:
     python test_multi_consultant.py
 """
+import os
 import sys
+from pathlib import Path
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+# Force database to be SQLite in-memory or a temporary file for tests
+os.environ["DATABASE_URL"] = "sqlite:///test_temp.db"
+
+from database import init_db, SessionLocal, DBConsultant, DBBooking, DBSchedulingState
 from models import Consultant, ConsultantWorkingHours, ConsultantLeave
 from services.calendar_service import _is_consultant_available
 from routers.calendar import _get_next_consultant_round_robin
@@ -82,7 +88,6 @@ def test_is_consultant_available():
 
 def test_round_robin_selection():
     print("Testing round-robin scheduling selection...")
-    from pathlib import Path
 
     wh = ConsultantWorkingHours(start="10:00", end="19:00", days=[0, 1, 2, 3, 4])
     c1 = Consultant(id="c1", name="Consultant 1", email="c1@company.com", active=True, calendar_id="c1@test.com", working_hours=wh)
@@ -90,27 +95,16 @@ def test_round_robin_selection():
     c3 = Consultant(id="c3", name="Consultant 3", email="c3@company.com", active=True, calendar_id="c3@test.com", working_hours=wh)
 
     # Isolate from production data
-    original_filepath = consultant_repo.filepath
-    original_lockpath = consultant_repo.lock_path
-
-    test_filepath = consultant_repo.filepath.parent / "consultants_test.json"
-    consultant_repo.filepath = test_filepath
-    consultant_repo.lock_path = str(test_filepath) + ".lock"
+    init_db()
+    db = SessionLocal()
+    try:
+        db.query(DBConsultant).delete()
+        db.query(DBSchedulingState).delete()
+        db.commit()
+    finally:
+        db.close()
 
     try:
-        # Clean existing test file if any
-        if test_filepath.exists():
-            try:
-                test_filepath.unlink()
-            except Exception:
-                pass
-        test_lock_file = Path(consultant_repo.lock_path)
-        if test_lock_file.exists():
-            try:
-                test_lock_file.unlink()
-            except Exception:
-                pass
-
         consultant_repo.create(c1)
         consultant_repo.create(c2)
         consultant_repo.create(c3)
@@ -137,22 +131,13 @@ def test_round_robin_selection():
 
         print("[OK] Round robin tests passed!")
     finally:
-        # Restore production config paths
-        consultant_repo.filepath = original_filepath
-        consultant_repo.lock_path = original_lockpath
-        
-        # Clean up test files
-        if test_filepath.exists():
-            try:
-                test_filepath.unlink()
-            except Exception:
-                pass
-        test_lock_file = Path(str(test_filepath) + ".lock")
-        if test_lock_file.exists():
-            try:
-                test_lock_file.unlink()
-            except Exception:
-                pass
+        db = SessionLocal()
+        try:
+            db.query(DBConsultant).delete()
+            db.query(DBSchedulingState).delete()
+            db.commit()
+        finally:
+            db.close()
 
 
 def test_hourly_slots_and_capacity():
@@ -162,7 +147,6 @@ def test_hourly_slots_and_capacity():
     from services.calendar_service import _generate_candidate_slots, GoogleCalendarService
     from services.booking_service import booking_repo
     from models import Booking
-    from pathlib import Path
     
     tz = ZoneInfo("Asia/Kolkata")
     # A Monday
@@ -186,28 +170,16 @@ def test_hourly_slots_and_capacity():
     c3 = Consultant(id="c3", name="Consultant 3", email="c3@company.com", active=True, calendar_id="primary", working_hours=wh)
     
     # Isolate consultant and booking data
-    orig_c_filepath = consultant_repo.filepath
-    orig_c_lockpath = consultant_repo.lock_path
-    orig_b_filepath = booking_repo.filepath
-    orig_b_lockpath = booking_repo.lock_path
-    
-    test_c_filepath = consultant_repo.filepath.parent / "consultants_test_capacity.json"
-    test_b_filepath = booking_repo.filepath.parent / "bookings_test_capacity.json"
-    
-    consultant_repo.filepath = test_c_filepath
-    consultant_repo.lock_path = str(test_c_filepath) + ".lock"
-    booking_repo.filepath = test_b_filepath
-    booking_repo.lock_path = str(test_b_filepath) + ".lock"
-    
+    init_db()
+    db = SessionLocal()
     try:
-        # Clean existing test files
-        for f in [test_c_filepath, test_b_filepath, Path(consultant_repo.lock_path), Path(booking_repo.lock_path)]:
-            if f.exists():
-                try:
-                    f.unlink()
-                except Exception:
-                    pass
-                    
+        db.query(DBConsultant).delete()
+        db.query(DBBooking).delete()
+        db.commit()
+    finally:
+        db.close()
+        
+    try:
         consultant_repo.create(c1)
         consultant_repo.create(c2)
         consultant_repo.create(c3)
@@ -218,8 +190,25 @@ def test_hourly_slots_and_capacity():
         
         # Slot should be available initially (0 bookings)
         svc = GoogleCalendarService()
+        
+        from unittest.mock import patch
+        class MockDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return from_dt
+
+        def get_capacity(start_dt):
+            with patch("services.calendar_service.datetime", MockDatetime):
+                slots_data = svc.get_available_slots(days_ahead=7)
+            for s in slots_data:
+                s_dt = datetime.fromisoformat(s["start"].replace("Z", "+00:00"))
+                if s_dt == start_dt:
+                    return s["remaining_capacity"]
+            return None
+
         available_c = svc.get_available_consultants(slot_start, slot_end)
         assert len(available_c) == 3, f"Expected 3 available consultants, got {len(available_c)}"
+        assert get_capacity(slot_start) == 3, f"Expected slot remaining capacity to be 3, got {get_capacity(slot_start)}"
         
         # Add 1 booking for c1
         bk1 = Booking(
@@ -233,6 +222,7 @@ def test_hourly_slots_and_capacity():
         available_c = svc.get_available_consultants(slot_start, slot_end)
         assert len(available_c) == 2, f"Expected 2 available consultants, got {len(available_c)}"
         assert "c1" not in [c.id for c in available_c], "Consultant c1 should be busy"
+        assert get_capacity(slot_start) == 2, f"Expected slot remaining capacity to be 2, got {get_capacity(slot_start)}"
         
         # Add 2nd booking for c2
         bk2 = Booking(
@@ -246,6 +236,7 @@ def test_hourly_slots_and_capacity():
         available_c = svc.get_available_consultants(slot_start, slot_end)
         assert len(available_c) == 1, f"Expected 1 available consultant, got {len(available_c)}"
         assert "c3" in [c.id for c in available_c], "Consultant c3 should be the only one available"
+        assert get_capacity(slot_start) == 1, f"Expected slot remaining capacity to be 1, got {get_capacity(slot_start)}"
         
         # Add 3rd booking for c3
         bk3 = Booking(
@@ -258,22 +249,28 @@ def test_hourly_slots_and_capacity():
         # Slot should now be unavailable (0 consultants left)
         available_c = svc.get_available_consultants(slot_start, slot_end)
         assert len(available_c) == 0, f"Expected 0 available consultants, got {len(available_c)}"
+        assert get_capacity(slot_start) == 0, f"Expected slot remaining capacity to be 0, got {get_capacity(slot_start)}"
+        
+        # Test cancel_booking route
+        import asyncio
+        from routers.calendar import cancel_booking
+        
+        res = asyncio.run(cancel_booking("bk1"))
+        assert res["ok"] == True
+        assert booking_repo.get_by_id("bk1").status == "cancelled"
+        
+        # Capacity should go up to 1 after cancelling 1 booking
+        assert get_capacity(slot_start) == 1, f"Expected slot remaining capacity to be 1 after cancel, got {get_capacity(slot_start)}"
         
         print("[OK] Hourly slots and capacity tests passed!")
     finally:
-        # Restore original paths
-        consultant_repo.filepath = orig_c_filepath
-        consultant_repo.lock_path = orig_c_lockpath
-        booking_repo.filepath = orig_b_filepath
-        booking_repo.lock_path = orig_b_lockpath
-        
-        # Clean up test files
-        for f in [test_c_filepath, test_b_filepath, Path(str(test_c_filepath) + ".lock"), Path(str(test_b_filepath) + ".lock")]:
-            if f.exists():
-                try:
-                    f.unlink()
-                except Exception:
-                    pass
+        db = SessionLocal()
+        try:
+            db.query(DBConsultant).delete()
+            db.query(DBBooking).delete()
+            db.commit()
+        finally:
+            db.close()
 
 
 if __name__ == "__main__":
@@ -288,4 +285,13 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n[ERROR] UNEXPECTED ERROR: {e}")
         sys.exit(1)
+    finally:
+        # Clean up temporary DB file
+        for p in ["test_temp.db", "test_temp.db-journal"]:
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
+
 
