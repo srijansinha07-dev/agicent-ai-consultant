@@ -68,15 +68,7 @@ export function ConsultantPanel({ chat }: ConsultantPanelProps) {
     return last.role === 'assistant' ? last : null
   }, [chat.messages])
 
-  const lastUserBeforeAssistant = useMemo(() => {
-    if (!lastAssistantMessage) return null
-    const lastAssistantIndex = chat.messages.findIndex((m) => m.id === lastAssistantMessage.id)
-    if (lastAssistantIndex < 0) return null
-    for (let i = lastAssistantIndex - 1; i >= 0; i -= 1) {
-      if (chat.messages[i].role === 'user') return chat.messages[i]
-    }
-    return null
-  }, [chat.messages, lastAssistantMessage])
+
 
   const showConsultationCta = useMemo(() => {
     if (chat.isLoading) return false
@@ -105,38 +97,38 @@ export function ConsultantPanel({ chat }: ConsultantPanelProps) {
 
   const shellStyle: React.CSSProperties = isExpanded
     ? {
-        position: 'fixed',
-        inset: 0,
-        width: '100vw',
-        height: '100vh',
-        maxWidth: '100vw',
-        maxHeight: '100vh',
-        zIndex: 2147483000,
-        borderRadius: 0,
-        border: 'none',
-        boxShadow: 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--bg)',
-        overflow: 'hidden',
-      }
+      position: 'fixed',
+      inset: 0,
+      width: '100vw',
+      height: '100vh',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      zIndex: 2147483000,
+      borderRadius: 0,
+      border: 'none',
+      boxShadow: 'none',
+      display: 'flex',
+      flexDirection: 'column',
+      background: 'var(--bg)',
+      overflow: 'hidden',
+    }
     : {
-        position: 'fixed',
-        bottom: '92px',
-        right: '24px',
-        zIndex: 2147483000,
-        width: 'var(--widget-width)',
-        height: 'var(--widget-height)',
-        maxHeight: 'calc(100vh - 120px)',
-        borderRadius: 'var(--radius)',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--bg)',
-        border: '1px solid var(--border-strong)',
-        boxShadow: 'var(--shadow-lg)',
-        overflow: 'hidden',
-        animation: 'expand-panel 0.22s ease-out',
-      }
+      position: 'fixed',
+      bottom: '92px',
+      right: '24px',
+      zIndex: 2147483000,
+      width: 'var(--widget-width)',
+      height: 'var(--widget-height)',
+      maxHeight: 'calc(100vh - 120px)',
+      borderRadius: 'var(--radius)',
+      display: 'flex',
+      flexDirection: 'column',
+      background: 'var(--bg)',
+      border: '1px solid var(--border-strong)',
+      boxShadow: 'var(--shadow-lg)',
+      overflow: 'hidden',
+      animation: 'expand-panel 0.22s ease-out',
+    }
 
   return (
     <div
