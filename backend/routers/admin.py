@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, BackgroundTasks
 from pydantic import BaseModel
 
 from config import CONSULTATION_ADMIN_KEY
@@ -234,3 +234,112 @@ async def complete_booking_endpoint(id: str):
     booking.status = "completed"
     updated = booking_repo.update(id, booking)
     return updated
+
+
+# ── TEMPORARY RECOVERY ENDPOINT ────────────────────────────────────────────
+
+def _run_reindex():
+    import os
+    print("\n[Recovery] === STARTING PRODUCTION REINDEX ===")
+    
+    # 1. Railway Safety Guard
+    if not os.getenv("RAILWAY_ENVIRONMENT"):
+        print("[Recovery] Refusing to run outside Railway")
+        return
+
+    # 2. Verify Data File Exists exactly as ingest_website sees it
+    from ingest_website import INPUT_FILE
+    data_path = os.path.abspath(INPUT_FILE)
+    exists = os.path.exists(data_path)
+    print(f"[Recovery] Data file exists: {exists}")
+    print(f"[Recovery] Resolved path: {data_path}")
+    if not exists:
+        print(f"[Recovery] FATAL: {INPUT_FILE} is missing.")
+        return
+    print(f"[Recovery] File size: {os.path.getsize(data_path)} bytes")
+
+    # 3. Load the embedding model FIRST & 4. Run a small test embedding
+    print("[Recovery] Loading embedding model...")
+    try:
+        from services.vectorstore import _embed
+        # This natively triggers the Hugging Face download if missing
+        test_result = _embed(["hello world"])
+        if not test_result or len(test_result[0]) == 0:
+            raise ValueError("Embedding result was empty.")
+        print("[Recovery] Embedding model loaded successfully")
+        print(f"[Recovery] Embedding type: {type(test_result)}")
+        print(f"[Recovery] Embedding count: {len(test_result)}")
+        print(f"[Recovery] Embedding dimensions: {len(test_result[0])}")
+        print("[Recovery] Test embedding generated successfully")
+        print("[Recovery] Safe to proceed with deletion")
+    except Exception as e:
+        print(f"[Recovery] FATAL: Model loading or test embedding failed: {e}")
+        print("[Recovery] Aborting recovery before touching DB.")
+        return
+
+    # 5. Before Verification
+    import chromadb
+    from config import CHROMA_PATH
+    from chromadb.config import Settings
+    
+    try:
+        client = chromadb.PersistentClient(
+            path=CHROMA_PATH,
+            settings=Settings(anonymized_telemetry=False)
+        )
+        collections = client.list_collections()
+        print(f"[Recovery] BEFORE DELETE total collections: {len(collections)}")
+        print(f"[Recovery] BEFORE DELETE collection names: {[c.name for c in collections]}")
+        try:
+            c = client.get_collection("agicent-website")
+            print(f"[Recovery] BEFORE DELETE count={c.count()}")
+        except Exception:
+            print("[Recovery] BEFORE DELETE count=0 (not found)")
+    except Exception as e:
+        print(f"[Recovery] Error reading Chroma DB before delete: {e}")
+        return
+
+    # 6. Delete the corrupted collection
+    print(f"[Recovery] Deleting collection: agicent-website")
+    try:
+        client.delete_collection("agicent-website")
+        print("[Recovery] Collection deleted successfully.")
+    except Exception as e:
+        print(f"[Recovery] Warning during deletion: {e}")
+
+    # 7. Run the ingestion script
+    print("[Recovery] Calling ingest_website()...")
+    try:
+        from ingest_website import ingest_website
+        ingest_website()
+        print("[Recovery] ingest_website() completed.")
+    except Exception as e:
+        print(f"[Recovery] FATAL: Ingestion failed: {e}")
+        return
+
+    # 8. After Verification
+    try:
+        collections = client.list_collections()
+        print(f"[Recovery] AFTER INGEST total collections: {len(collections)}")
+        print(f"[Recovery] AFTER INGEST collection names: {[c.name for c in collections]}")
+        try:
+            c = client.get_collection("agicent-website")
+            print(f"[Recovery] AFTER INGEST count={c.count()}")
+        except Exception:
+            print("[Recovery] AFTER INGEST count=0 (not found)")
+        print("[Recovery] === REINDEX FINISHED ===")
+    except Exception as e:
+        print(f"[Recovery] Verification failed: {e}")
+
+
+@router.post("/reindex-website-recovery", dependencies=[Depends(verify_admin_token)])
+async def reindex_website_recovery_endpoint(background_tasks: BackgroundTasks):
+    """
+    TEMPORARY production recovery endpoint. 
+    Deletes the corrupted ChromaDB collection and runs native ingestion.
+    """
+    background_tasks.add_task(_run_reindex)
+    return {
+        "ok": True, 
+        "message": "Reindex started in background. Monitor Railway logs for progress."
+    }
