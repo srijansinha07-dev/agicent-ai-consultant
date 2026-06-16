@@ -38,6 +38,7 @@ export interface ChatRequest {
   history?: ChatHistoryItem[]
   session_id?: string // used by consultant agent for stateful memory
   booking_state?: BookingState | null
+  language?: string
 }
 
 export interface Source {
@@ -69,6 +70,10 @@ export interface ChatMessage {
   sources?: Source[]
   queryType?: QueryType
   timestamp: number
+  language?: string
+  /** When set, this message was sent via voice. The transcript (content) stays
+   *  internal; the UI renders an audio bubble pointing to this URL instead. */
+  voiceNoteUrl?: string
   /** Optional: consultation CTA intent for this assistant message. */
   consultationIntent?: 'request' | 'connect'
   /** Optional: pre-fill text for the consultation form. */

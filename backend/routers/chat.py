@@ -10,6 +10,7 @@ Now powered by a LangGraph multi-node RAG pipeline
 from __future__ import annotations
 
 import os
+from typing import Optional
 
 from fastapi import Header
 from fastapi import APIRouter, HTTPException
@@ -39,6 +40,7 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
 
     from services.website_support import is_website_doc
     website_doc = is_website_doc(req.doc_id)
+    effective_query = _query_with_language_hint(req.query, req.language)
 
     # ── NEW: Consultant Agent (stateful, token-optimised, agentic) ────────
     # Takes priority over all legacy paths for website docs when enabled.
@@ -60,6 +62,7 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
                 pages_all   = pages,
                 doc_info    = info,
                 booking_state = req.booking_state,
+                language    = req.language,
             )
 
             answer           = result["answer"]
@@ -119,12 +122,12 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
                 route_without_retrieval,
             )
 
-            intent = classify_intent(req.query, req.history)
+            intent = classify_intent(effective_query, req.history)
             if route_without_retrieval(intent):
                 return ChatResponse(
                     answer=generate_conversational_reply(
                         intent=intent,
-                        query=req.query,
+                        query=effective_query,
                         history=req.history,
                     ),
                     query_type=QueryType.CONCEPT,
@@ -144,7 +147,7 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
 
             result = run_agentic_chat(
                 doc_id=req.doc_id,
-                query=req.query,
+                query=effective_query,
                 chunks_all=chunks,
                 pages_all=pages,
                 doc_info=info,
@@ -154,7 +157,7 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
             from services.langgraph_chat import run_chat_graph
             result = run_chat_graph(
                 doc_id=req.doc_id,
-                query=req.query,
+                query=effective_query,
                 chunks_all=chunks,
                 pages_all=pages,
                 doc_info=info,
@@ -164,7 +167,7 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
         from services.langgraph_chat import run_chat_graph
         result = run_chat_graph(
             doc_id=req.doc_id,
-            query=req.query,
+            query=effective_query,
             chunks_all=chunks,
             pages_all=pages,
             doc_info=info,
@@ -231,6 +234,27 @@ def _confidence(score: float, ocr_sourced: bool) -> ConfidenceLevel:
     if base >= 0.3:
         return ConfidenceLevel.MEDIUM
     return ConfidenceLevel.LOW
+
+
+def _query_with_language_hint(query: str, language: Optional[str]) -> str:
+    """Apply conversational language-style mirroring without changing agent internals."""
+    if not language:
+        return query
+
+    code = language.lower().strip()
+    if code in ("hi", "hindi"):
+        return (
+            "[CRITICAL STYLE INSTRUCTION: The user is speaking Hindi or Hinglish. "
+            "You MUST respond entirely in conversational Romanized Hindi (Hinglish). "
+            "DO NOT use Devanagari script. "
+            "DO NOT literally translate technical terms (e.g., keep terms like 'dashboard', 'AI', 'resume parsing', 'tech stack' in English). "
+            "Mix natural Hindi sentence structure with English technical vocabulary.]\n\n"
+            f"{query}"
+        )
+    if code in ("en", "english"):
+        return f"[Respond naturally in English.]\n\n{query}"
+
+    return query
 
 @router.get("/debug/docs")
 async def debug_docs():

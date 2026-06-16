@@ -7,7 +7,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from config import CORS_ORIGINS
-from routers import chat, documents, consultations, calendar, admin
+from routers import chat, documents, consultations, calendar, admin, voice
 from services import docstore
 
 app = FastAPI(
@@ -43,6 +43,7 @@ app.include_router(chat.router)
 app.include_router(consultations.router)
 app.include_router(calendar.router)
 app.include_router(admin.router)
+app.include_router(voice.router)
 
 
 # ── Startup ─────────────────────────────────────────────
@@ -65,6 +66,30 @@ async def startup():
         print("✅ POSTGRES DATABASE INITIALIZED")
     except Exception as e:
         print(f"❌ POSTGRES DATABASE ERROR: {e}")
+
+    # D3: Pre-warm Whisper model in a background daemon thread so the first
+    # voice request doesn't cold-start and timeout. A plain daemon thread is
+    # used instead of ThreadPoolExecutor because:
+    #   - No executor lifecycle or atexit handler to manage
+    #   - Daemon flag ensures OS reclaims it on interpreter exit without blocking
+    #   - _get_model() uses a global singleton, so duplicate prewarm calls are safe
+    try:
+        from config import VOICE_ENABLED
+        if VOICE_ENABLED:
+            import threading
+
+            def _prewarm_whisper():
+                try:
+                    from services.voice_transcription import _get_model
+                    _get_model()
+                    print("\u2705 WHISPER MODEL PRELOADED")
+                except Exception as exc:
+                    print(f"\u26a0\ufe0f  WHISPER PREWARM FAILED (voice will lazy-load on first request): {exc}")
+
+            t = threading.Thread(target=_prewarm_whisper, daemon=True, name="whisper-prewarm")
+            t.start()
+    except Exception as e:
+        print(f"\u26a0\ufe0f  WHISPER PREWARM SKIPPED: {e}")
 
     # ── Ensure website knowledge base exists ───────────
     try:

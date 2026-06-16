@@ -57,6 +57,13 @@ class ChatRequest(BaseModel):
     history:    list[dict] = []
     session_id: Optional[str] = None  # used by consultant agent for stateful memory
     booking_state: Optional[dict] = None  # optional active booking details from frontend
+    language:   Optional[str] = None  # optional ISO-ish code from voice STT (e.g. "en", "hi")
+
+
+class VoiceTranscriptionResponse(BaseModel):
+    text: str
+    language: str
+    confidence: Optional[float] = None
 
 class Source(BaseModel):
     doc_id:      str

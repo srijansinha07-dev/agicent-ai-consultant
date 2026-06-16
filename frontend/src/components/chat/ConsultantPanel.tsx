@@ -230,6 +230,7 @@ export function ConsultantPanel({ chat }: ConsultantPanelProps) {
           <div className={isExpanded ? 'consultant-workspace-footer' : undefined}>
             <ChatInput
               onSend={chat.sendMessage}
+              onVoiceLanguage={chat.setUserLanguage}
               disabled={chat.isLoading}
               isEmpty={isEmpty}
               isExpanded={isExpanded}

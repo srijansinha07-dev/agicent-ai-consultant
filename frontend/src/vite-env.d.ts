@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_USER_ID: string
   readonly VITE_EMBED_MODE?: string
   readonly VITE_MOUNT_ID?: string
+  readonly VITE_VOICE_ENABLED?: string
+  readonly VITE_VOICE_MAX_AUDIO_MB?: string
 }
 
 interface ImportMeta {

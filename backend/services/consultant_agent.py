@@ -71,6 +71,7 @@ def run_consultant_agent(
     pages_all: list,
     doc_info: Any,
     booking_state: Optional[dict] = None,
+    language: str | None = None,
 ) -> dict:
     """
     Main entry point. Returns the same dict as run_chat_graph():
@@ -121,6 +122,7 @@ def run_consultant_agent(
         return _handle_state_only_answer(
             state=state, session_id=session_id, query=query,
             history=history, doc_info=doc_info, action=action, intent=intent,
+            language=language,
         )
 
     # ── Retrieval paths ────────────────────────────────────────────────────
@@ -129,6 +131,7 @@ def run_consultant_agent(
             state=state, session_id=session_id, query=query,
             history=history, doc_id=doc_id, chunks_all=chunks_all,
             pages_all=pages_all, doc_info=doc_info, action=action, intent=intent,
+            language=language,
         )
 
     # Default: RETRIEVE_AND_ANSWER
@@ -136,6 +139,7 @@ def run_consultant_agent(
         state=state, session_id=session_id, query=query,
         history=history, doc_id=doc_id, chunks_all=chunks_all,
         pages_all=pages_all, doc_info=doc_info, action=action, intent=intent,
+        language=language,
     )
 
 
@@ -370,6 +374,7 @@ def _handle_recommendation(
     doc_info: Any,
     action: AgentAction,
     intent: Intent,
+    language: str | None = None,
 ) -> dict:
     """
     Give an Agicent-specific recommendation using state context + limited retrieval.
@@ -380,15 +385,16 @@ def _handle_recommendation(
     state_snippet = state.to_context_snippet()
     recent_msgs   = _format_recent_history(history, n=_MAX_HISTORY_MSGS)
     summary_block = f"Conversation so far: {state.conversation_summary}\n" if state.conversation_summary else ""
+    lang_prefix   = _language_prefix(language)
 
     prompt = (
-        f"{CONSULTANT_PROMPT_COMPRESSED}\n\n"
+        f"{lang_prefix}{CONSULTANT_PROMPT_COMPRESSED}\n\n"
         f"{summary_block}"
         f"Known project context: {state_snippet}\n\n"
         + (f"Information:\n{context_text}\n\n" if context_text else "")
         + f"{recent_msgs}"
         f"USER: {query}\n\n"
-        "AGICENT AI CONSULTANT RESPONSE (explain how we would approach this specific project):"
+        "AGICENT AI CONSULTANT RESPONSE (explain how Agicent would approach this specific project):"
     )
 
     answer = _groq(prompt, max_tokens=_ANSWER_MAX_TOKENS)
@@ -414,6 +420,7 @@ def _handle_retrieve_and_answer(
     doc_info: Any,
     action: AgentAction,
     intent: Intent,
+    language: str | None = None,
 ) -> dict:
     """
     Intent-aware RAG path. Retrieval budget is controlled per intent.
@@ -431,12 +438,13 @@ def _handle_retrieve_and_answer(
     state_snippet = state.to_context_snippet()
     recent_msgs   = _format_recent_history(history, n=_MAX_HISTORY_MSGS)
     summary_block = f"Conversation so far: {state.conversation_summary}\n" if state.conversation_summary else ""
+    lang_prefix   = _language_prefix(language)
 
     # Intent-specific instruction
     intent_instruction = _intent_instruction(intent, query)
 
     prompt = (
-        f"{CONSULTANT_PROMPT_COMPRESSED}\n\n"
+        f"{lang_prefix}{CONSULTANT_PROMPT_COMPRESSED}\n\n"
         f"{summary_block}"
         + (f"Known project context:\n{state_snippet}\n\n" if state_snippet else "")
         + (f"Information:\n{context_text}\n\n" if context_text else "")
@@ -475,6 +483,7 @@ def _handle_state_only_answer(
     doc_info: Any,
     action: AgentAction,
     intent: Intent,
+    language: str | None = None,
 ) -> dict:
     """
     Handles BOOKING_STATUS, BOOKING_MANAGEMENT, and CONSULTATION_STATUS.
@@ -486,9 +495,10 @@ def _handle_state_only_answer(
     state_snippet = state.to_context_snippet()
     recent_msgs   = _format_recent_history(history, n=2)  # only last 2 turns
     intent_instruction = _intent_instruction(intent, query)
+    lang_prefix   = _language_prefix(language)
 
     prompt = (
-        f"{CONSULTANT_PROMPT_COMPRESSED}\n\n"
+        f"{lang_prefix}{CONSULTANT_PROMPT_COMPRESSED}\n\n"
         + (f"Known project context: {state_snippet}\n\n" if state_snippet else "")
         + f"{recent_msgs}"
         f"USER: {query}\n\n"
@@ -512,6 +522,37 @@ def _handle_state_only_answer(
                  budget=state.budget, timeline=state.timeline)
 
 
+# ── Language-style prefix ───────────────────────────────────────────────────
+
+def _language_prefix(language: str | None) -> str:
+    """
+    Return a short language-mode override to prepend before CONSULTANT_PROMPT_COMPRESSED.
+    Placed at position-0 of the final prompt so it always reaches the model at full
+    length — bypasses the 200-char per-message truncation in _format_recent_history.
+    English mode: no prefix (system prompt unchanged).
+    Hinglish mode: suspends the 'we/our' branding rule and enforces natural Hinglish.
+    """
+    if not language:
+        return ""
+    code = language.lower().strip()
+    if code in ("hi", "hindi"):
+        return (
+            "[HINGLISH MODE] Respond in natural conversational Indian Hinglish.\n"
+            "STYLE:\n"
+            "- Mix Hindi and English naturally, the way a senior product consultant texts on WhatsApp.\n"
+            "- Vary your opening: never start the same way twice. Do NOT use fixed starters like "
+            "'Mere hisaab se', 'Samajh gaya', or 'Aapke use case mein' on every reply.\n"
+            "- Answer the question directly and specifically before asking anything.\n"
+            "- Use domain-specific vocabulary: healthcare → EHR, HIPAA, patients, doctors; "
+            "recruitment → ATS, resume parsing, candidate ranking; support → ticketing, escalation.\n"
+            "- Ask ONE targeted next question based on what the user actually said.\n"
+            "- Do NOT describe Agicent. Do NOT say 'Agicent typically' or 'Agicent recommends'.\n"
+            "- Keep technical terms in English (API, MVP, Cloud, React, FastAPI).\n"
+            "- Short sentences. No Devanagari script. No generic filler.\n\n"
+        )
+    return ""
+
+
 # ── Intent-specific prompt instructions ─────────────────────────────────────
 
 def _intent_instruction(intent: Intent, query: str) -> str:
@@ -520,47 +561,51 @@ def _intent_instruction(intent: Intent, query: str) -> str:
 
     if intent == Intent.KNOWLEDGE_CASE_STUDY:
         return (
-            "AGICENT AI CONSULTANT RESPONSE (Describe relevant case studies or project examples based on the provided information. "
-            "Be specific about what we built, the industry, and the outcome. "
-            "If you don't have a specific example, simply say you don't have one right now but can share similar work):"
+            "RESPONSE (Describe relevant case studies: what was built, industry, outcome. "
+            "Answer directly. No fabricating):"
         )
     if intent == Intent.KNOWLEDGE_PRICING:
         return (
-            "AGICENT AI CONSULTANT RESPONSE (Explain our engagement models and pricing approach based on the provided information. "
-            "Do not invent specific numbers. If specific pricing isn't available, explain the factors that typically influence cost):"
+            "RESPONSE (Explain engagement models/costs. NO INVENTED NUMBERS. "
+            "Ask about missing scope before giving ranges):"
         )
     if intent == Intent.KNOWLEDGE_TECHNOLOGY:
         return (
-            "AGICENT AI CONSULTANT RESPONSE (Describe our technology capabilities and stack based on the provided information. "
-            "Be specific about what technologies, frameworks, and platforms we work with):"
+            "RESPONSE (Answer tech question directly based on THIS context. "
+            "Don't list full stack):"
         )
     if intent == Intent.KNOWLEDGE_COMPANY:
         return (
-            "AGICENT AI CONSULTANT RESPONSE (Give a concise, factual overview of what Agicent does, "
-            "who we serve, and what makes us different based on the provided information. Do not use marketing language):"
+            "RESPONSE (Give factual company overview based on context. No marketing fluff):"
         )
     if intent == Intent.KNOWLEDGE_PROCESS:
         return (
-            "AGICENT AI CONSULTANT RESPONSE (Describe our development and delivery process based on the provided information. "
-            "Be specific about methodology, phases, and how we structure projects):"
+            "RESPONSE (Describe delivery process/methodology specifically. Answer directly):"
         )
     if intent in (Intent.BOOKING_STATUS, Intent.BOOKING_MANAGEMENT):
         return (
-            "AGICENT AI CONSULTANT RESPONSE (Review the 'Active Booking' or 'Booking' details from the known project information. "
+            "AGICENT AI CONSULTANT RESPONSE "
+            "(Review the 'Active Booking' or 'Booking' details from the known project information. "
             "If booking details exist, confirm the exact date, time, and Google Meet link provided. "
             "NEVER generate placeholder text like '[insert date]' or '[insert link]'. "
-            "If no booking details are found, politely say you don't see a booking in this chat session and ask them to check their email):"
+            "If no booking details are found, say you don't see a booking in this session and ask them to check their email):"
         )
     if intent == Intent.CONSULTATION_STATUS:
         return (
-            "AGICENT AI CONSULTANT RESPONSE (Address the consultation status question directly. "
-            "Explain that consultation requests are securely routed to our team and we will reach out "
-            "by email within one business day):"
+            "AGICENT AI CONSULTANT RESPONSE "
+            "(Address the consultation status question directly. "
+            "Explain that consultation requests are securely routed to the Agicent team "
+            "and they will follow up by email within one business day):"
         )
     if intent == Intent.GENERAL_QUESTION:
-        return "AGICENT AI CONSULTANT RESPONSE (Answer the question naturally and concisely):"
+        return (
+            "AGICENT AI CONSULTANT RESPONSE "
+            "(Answer the question directly and concisely. "
+            "If the user describes their project, acknowledge it and ask the single "
+            "most important clarifying question — not a list of questions):"
+        )
 
-    return "AGICENT AI CONSULTANT RESPONSE:"
+    return "RESPONSE (Answer directly without padding):"
 
 
 # ── Discovery helpers ─────────────────────────────────────────────────────────

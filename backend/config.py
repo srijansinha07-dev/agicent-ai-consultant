@@ -37,6 +37,19 @@ CONSULTATION_FORWARD_URL = os.getenv("CONSULTATION_FORWARD_URL", "").strip()
 # If set, admin staff can fetch stored consultations with this key.
 CONSULTATION_ADMIN_KEY = os.getenv("CONSULTATION_ADMIN_KEY", "").strip()
 
+# ── Voice (Faster-Whisper STT) ─────────────────────────────────────────────
+VOICE_ENABLED = os.getenv("VOICE_ENABLED", "true").lower() == "true"
+# Model size tradeoff:
+#   small  (~460 MB RAM) — fast, good English, poor Hinglish. Good for local dev.
+#   medium (~1.5 GB RAM) — slower, significantly better Hindi/Hinglish accuracy.
+# PRODUCTION (Railway): Set WHISPER_MODEL_SIZE=medium for acceptable Hinglish quality.
+# Ensure Railway service has at least 2 GB RAM when using medium.
+WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "small").strip()
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu").strip()
+WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8").strip()
+# MUST match frontend VITE_VOICE_MAX_AUDIO_MB * 1024 * 1024 to avoid silent 413 errors.
+VOICE_MAX_AUDIO_BYTES = int(os.getenv("VOICE_MAX_AUDIO_BYTES", str(10 * 1024 * 1024)))
+
 # ── Consultant Agent ───────────────────────────────────────────────────────
 # Master toggle: "false" falls back to legacy langgraph path for website docs.
 CONSULTANT_AGENT_ENABLED = os.getenv("CONSULTANT_AGENT_ENABLED", "true").lower() == "true"

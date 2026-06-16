@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { env } from '@/config/env'
 import { postChat } from '@/services/api'
@@ -6,6 +6,7 @@ import type { BookingState, ChatHistoryItem, ChatMessage, ViewMode } from '@/typ
 
 const STORAGE_KEY = 'agicent_chat_messages'
 const SESSION_KEY = 'agicent_chat_session'
+const LANGUAGE_KEY = 'agicent_chat_language'
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -23,6 +24,26 @@ function loadMessages(): ChatMessage[] {
 function saveMessages(messages: ChatMessage[]): void {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+  } catch {
+    // ignore
+  }
+}
+
+function loadUserLanguage(): string | null {
+  try {
+    return sessionStorage.getItem(LANGUAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function saveUserLanguage(language: string | null): void {
+  try {
+    if (language) {
+      sessionStorage.setItem(LANGUAGE_KEY, language)
+    } else {
+      sessionStorage.removeItem(LANGUAGE_KEY)
+    }
   } catch {
     // ignore
   }
@@ -72,14 +93,43 @@ function computeConsultationIntent(latestUser: ChatMessage): 'request' | 'connec
   return 'request'
 }
 
+function detectLanguageStyle(text: string, currentLanguage: string | null): string | null {
+  const hindiRegex = /[\u0900-\u097F]/
+  if (hindiRegex.test(text)) {
+    return 'hi'
+  }
+
+  const hinglishTerms = [
+    'mujhe', 'chahiye', 'banana', 'kaise', 'kya', 'kar sakte', 
+    'hain', 'kiya', 'mera', 'aap', 'kaafi', 'zarurat', 'hogi', 'karo', 'karenge', 'liye'
+  ]
+  const lowerText = text.toLowerCase()
+  for (const term of hinglishTerms) {
+    if (lowerText.includes(term)) {
+      return 'hi'
+    }
+  }
+
+  const englishTerms = ['what', 'how', 'why', 'can you', 'please', 'explain', 'recommend', 'could you', 'is there', 'tell me']
+  for (const term of englishTerms) {
+    if (lowerText.includes(term)) {
+      return 'en'
+    }
+  }
+
+  return currentLanguage
+}
+
 export interface UseChatReturn {
   viewMode: ViewMode
   messages: ChatMessage[]
   isLoading: boolean
   error: string | null
   sessionId: string
+  userLanguage: string | null
   setViewMode: (mode: ViewMode) => void
-  sendMessage: (query: string) => Promise<void>
+  sendMessage: (query: string, languageOverride?: string, voiceNoteUrl?: string) => Promise<void>
+  setUserLanguage: (language: string) => void
   clearMessages: () => void
   goHome: () => void
 }
@@ -90,39 +140,63 @@ export function useChat(): UseChatReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sessionId] = useState(getOrCreateSessionId)
+  const [userLanguage, setUserLanguageState] = useState<string | null>(loadUserLanguage)
+  const userLanguageRef = useRef<string | null>(loadUserLanguage())
 
   useEffect(() => {
     saveMessages(messages)
   }, [messages])
 
+  const setUserLanguage = useCallback((language: string) => {
+    userLanguageRef.current = language
+    setUserLanguageState(language)
+    saveUserLanguage(language)
+  }, [])
+
   const sendMessage = useCallback(
-    async (query: string) => {
+    async (query: string, languageOverride?: string, voiceNoteUrl?: string) => {
       if (!query.trim() || isLoading) return
+
+      let activeLanguage: string | null | undefined = languageOverride
+      if (!activeLanguage) {
+        const detectedLang = detectLanguageStyle(query, userLanguageRef.current)
+        activeLanguage = detectedLang ?? userLanguageRef.current
+      }
+
+      if (activeLanguage && activeLanguage !== userLanguageRef.current) {
+        setUserLanguage(activeLanguage)
+      }
 
       const userMessage: ChatMessage = {
         id: generateId(),
         role: 'user',
         content: query.trim(),
         timestamp: Date.now(),
+        language: activeLanguage ?? undefined,
+        voiceNoteUrl: voiceNoteUrl ?? undefined,
       }
 
       setMessages((prev) => [...prev, userMessage])
       setIsLoading(true)
       setError(null)
 
-      // Build history from current messages
       const history: ChatHistoryItem[] = messages.map((m) => ({
         role: m.role,
         content: m.content,
       }))
 
       try {
-        const response = await postChat({
-          doc_id: env.docId,
-          query: query.trim(),
-          history,
-          booking_state: getActiveBooking(),
-        }, env.userId, sessionId)
+        const response = await postChat(
+          {
+            doc_id: env.docId,
+            query: query.trim(),
+            history,
+            booking_state: getActiveBooking(),
+            language: activeLanguage ?? undefined,
+          },
+          env.userId,
+          sessionId,
+        )
 
         const intent = computeConsultationIntent(userMessage)
 
@@ -133,6 +207,7 @@ export function useChat(): UseChatReturn {
           sources: response.sources,
           queryType: response.query_type,
           timestamp: Date.now(),
+          language: activeLanguage ?? undefined,
           consultationIntent: response.consultationIntent ?? intent,
           consultationSummary: response.consultationSummary ?? undefined,
           availableSlots: response.availableSlots ?? undefined,
@@ -140,12 +215,10 @@ export function useChat(): UseChatReturn {
           timeline: response.timeline ?? undefined,
         }
 
-
         setMessages((prev) => [...prev, assistantMessage])
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.'
         setError(message)
-        // Remove the user message on failure so they can retry
         setMessages((prev) => prev.filter((m) => m.id !== userMessage.id))
       } finally {
         setIsLoading(false)
@@ -157,6 +230,9 @@ export function useChat(): UseChatReturn {
   const clearMessages = useCallback(() => {
     setMessages([])
     setError(null)
+    userLanguageRef.current = null
+    setUserLanguageState(null)
+    saveUserLanguage(null)
   }, [])
 
   return {
@@ -165,8 +241,10 @@ export function useChat(): UseChatReturn {
     isLoading,
     error,
     sessionId,
+    userLanguage,
     setViewMode,
     sendMessage,
+    setUserLanguage,
     clearMessages,
     goHome: clearMessages,
   }
