@@ -128,13 +128,10 @@ def health():
 # ── Run ─────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    _port = int(os.environ.get("PORT", 8080))
+    print(f"🚀 Binding to port {_port}  (PORT env={os.environ.get('PORT', 'not set')})")
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=int(
-            os.environ.get(
-                "PORT",
-                8000
-            )
-        ),
+        port=_port,
     )

@@ -17,6 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app
 COPY . .
 
-EXPOSE 10000
+# Railway injects $PORT at runtime. We expose 8080 here only as documentation;
+# the actual bound port is always whatever $PORT resolves to at startup.
+EXPOSE 8080
 
 CMD ["python", "main.py"]
