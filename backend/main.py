@@ -61,11 +61,17 @@ async def startup():
         print(f"❌ DOCSTORE ERROR: {e}")
         
     try:
-        from database import init_db
-        init_db()
-        print("✅ POSTGRES DATABASE INITIALIZED")
+        import threading
+        def _init_db_bg():
+            try:
+                from database import init_db
+                init_db()
+                print("\u2705 POSTGRES DATABASE INITIALIZED")
+            except Exception as exc:
+                print(f"\u274c POSTGRES DATABASE ERROR: {exc}")
+        threading.Thread(target=_init_db_bg, daemon=True, name="db-init").start()
     except Exception as e:
-        print(f"❌ POSTGRES DATABASE ERROR: {e}")
+        print(f"\u274c POSTGRES DATABASE ERROR: {e}")
 
     # D3: Pre-warm Whisper model in a background daemon thread so the first
     # voice request doesn't cold-start and timeout. A plain daemon thread is
@@ -121,8 +127,15 @@ def root():
     return "OK"
 
 
+@app.get("/health")
+def health_railway():
+    """Railway health check endpoint — must return 200 immediately."""
+    return {"status": "ok"}
+
+
 @app.get("/api/health")
 def health():
+    """Legacy health endpoint — kept for backward compatibility."""
     return "OK"
 
 # ── Run ─────────────────────────────────────────────────
