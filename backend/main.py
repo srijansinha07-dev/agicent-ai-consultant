@@ -73,48 +73,30 @@ async def startup():
     except Exception as e:
         print(f"\u274c POSTGRES DATABASE ERROR: {e}")
 
-    # ── Model Prewarming (DISABLED FOR DIAGNOSTICS) ────────────────
+    # D3: Pre-warm Whisper model in a background daemon thread so the first
+    # voice request doesn't cold-start and timeout. A plain daemon thread is
+    # used instead of ThreadPoolExecutor because:
+    #   - No executor lifecycle or atexit handler to manage
+    #   - Daemon flag ensures OS reclaims it on interpreter exit without blocking
+    #   - _get_model() uses a global singleton, so duplicate prewarm calls are safe
     try:
-        from config import log_memory
-        log_memory("Startup base memory before FastAPI binds")
-        print("⚠️ [STARTUP] ALL ML MODEL PREWARMING COMPLETELY DISABLED. Models will lazy-load.")
+        from config import VOICE_ENABLED
+        if VOICE_ENABLED:
+            import threading
+
+            def _prewarm_whisper():
+                try:
+                    from services.voice_transcription import _get_model
+                    _get_model()
+                    print("\u2705 WHISPER MODEL PRELOADED")
+                except Exception as exc:
+                    print(f"\u26a0\ufe0f  WHISPER PREWARM FAILED (voice will lazy-load on first request): {exc}")
+
+            t = threading.Thread(target=_prewarm_whisper, daemon=True, name="whisper-prewarm")
+            t.start()
     except Exception as e:
-        print(f"⚠️ MODEL LOGGING FAILED: {e}")
+        print(f"\u26a0\ufe0f  WHISPER PREWARM SKIPPED: {e}")
 
-    # ── Ensure website knowledge base exists (non-blocking) ────────────────
-    def _check_chroma_bg():
-        try:
-            import chromadb
-            from chromadb.config import Settings
-            from config import CHROMA_PATH
-
-            print(f"🔍 [STARTUP CHECK] Opening ChromaDB at exact path: {CHROMA_PATH}")
-
-            client = chromadb.PersistentClient(
-                path=CHROMA_PATH,
-                settings=Settings(anonymized_telemetry=False),
-            )
-
-            collections = client.list_collections()
-            print(f"📊 [STARTUP CHECK] Found {len(collections)} collections")
-
-            for c in collections:
-                count = c.count()
-                print(f"   - Collection: '{c.name}' | count: {count}")
-                if c.name == "agicent-website" and count < 4000:
-                    print(f"⚠️ [STARTUP CHECK] Collection {c.name} has only {count} chunks (expected ~4020). Rebuild logic disabled for memory profiling.")
-                    # try:
-                    #     from ingest_website import ingest_website
-                    #     ingest_website()
-                    #     print(f"✅ [STARTUP CHECK] Rebuild complete. New count: {c.count()}")
-                    # except Exception as rebuild_exc:
-                    #     print(f"❌ [STARTUP CHECK] Failed to rebuild: {rebuild_exc}")
-
-        except Exception as e:
-            print(f"❌ [STARTUP CHECK] ChromaDB Error: {e}")
-
-    import threading
-    threading.Thread(target=_check_chroma_bg, daemon=True, name="chroma-check").start()
 # ── Routes ──────────────────────────────────────────────
 
 # ── Routes ──────────────────────────────────────────────

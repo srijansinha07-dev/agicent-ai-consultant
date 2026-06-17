@@ -141,12 +141,9 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
 
     # ── Run pipeline (feature-gated agentic router with safe fallback) ───
     if AGENTIC_ROUTER_ENABLED:
-        from config import log_memory
-        log_memory("Before agentic chat/retrieval")
         try:
             # Lazy import keeps startup memory low.
             from services.agentic_chat import run_agentic_chat
-
             result = run_agentic_chat(
                 doc_id=req.doc_id,
                 query=effective_query,
@@ -154,7 +151,6 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
                 pages_all=pages,
                 doc_info=info,
             )
-            log_memory("After agentic chat/retrieval")
         except Exception as e:
             print(f"[Chat Router] Agentic path failed, falling back to LangGraph: {e}")
             from services.langgraph_chat import run_chat_graph
@@ -284,10 +280,95 @@ async def debug_docs():
 
 @router.post("/debug/ingest-website")
 async def ingest_website_debug():
-    from ingest_website import ingest_website
-    doc_id = ingest_website()
-    
+
+    import json
+    import uuid
+
+    from services.chunker import (
+        chunk_pages
+    )
+
+    from services.vectorstore import (
+        index_chunks
+    )
+
+    INPUT_FILE = (
+        "data/cleaned_pages_v2.json"
+    )
+
+    with open(
+        INPUT_FILE,
+        "r",
+        encoding="utf-8"
+    ) as f:
+
+        website_pages = (
+            json.load(f)
+        )
+
+    pages = []
+
+    for i, page in enumerate(
+        website_pages,
+        start=1
+    ):
+
+        combined_text = (
+            f"{page.get('title', '')}\n\n"
+            f"URL: {page.get('url', '')}\n\n"
+            f"{' | '.join(page.get('headings', []))}\n\n"
+            f"{page.get('content', '')}"
+        )
+
+        pages.append(
+            {
+                "page_num": i,
+                "text": combined_text,
+                "ocr_used": False,
+            }
+        )
+
+    doc_id = "agicent_website"
+       
+  
+
+    docstore.register(
+        doc_id=doc_id,
+        user_id="website_bot",
+        name="Agicent Website",
+        pdf_path="website://agicent",
+        pages=len(pages),
+    )
+
+    chunks = chunk_pages(
+        pages,
+        doc_id
+    )
+
+    docstore.set_pages(
+        doc_id,
+        pages
+    )
+
+    docstore.set_chunks(
+        doc_id,
+        chunks
+    )
+
+    index_chunks(
+        doc_id,
+        chunks
+    )
+
+    print("SKIPPING INDEXING")
+
+    docstore.set_status(
+        doc_id,
+        IndexStatus.READY
+    )
+
     return {
         "doc_id": doc_id,
+        "chunks": len(chunks),
         "status": "READY"
     }

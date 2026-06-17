@@ -26,18 +26,6 @@ else:
 
 CONSULTATIONS_FILE = BASE_DIR / "data" / "consultations.json"
 
-def log_memory(tag: str):
-    try:
-        with open('/proc/self/status') as f:
-            for line in f:
-                if line.startswith('VmRSS:'):
-                    mem_mb = int(line.split()[1]) / 1024
-                    print(f"📊 [MEMORY] {tag}: {mem_mb:.2f} MB")
-                    return mem_mb
-    except Exception:
-        print(f"📊 [MEMORY] {tag}: (Unavailable on this OS)")
-    return 0.0
-
 UPLOAD_DIR.mkdir(exist_ok=True)
 CHROMA_DIR.mkdir(exist_ok=True)
 CONSULTATIONS_FILE.parent.mkdir(exist_ok=True)
