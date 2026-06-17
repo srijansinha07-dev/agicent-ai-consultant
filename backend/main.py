@@ -81,21 +81,47 @@ async def startup():
     #   - _get_model() uses a global singleton, so duplicate prewarm calls are safe
     try:
         from config import VOICE_ENABLED
-        if VOICE_ENABLED:
-            import threading
+        import threading
 
-            def _prewarm_whisper():
+        def _prewarm_models():
+            import os
+            
+            def get_mem_mb():
                 try:
+                    with open('/proc/self/status') as f:
+                        for line in f:
+                            if line.startswith('VmRSS:'):
+                                return int(line.split()[1]) / 1024
+                except:
+                    pass
+                return 0.0
+
+            mem_start = get_mem_mb()
+            print(f"📊 [MEMORY] Startup base memory: {mem_start:.2f} MB")
+
+            try:
+                print("⏳ PREWARMING EMBEDDER (BACKGROUND)...")
+                from services.vectorstore import _get_embedder
+                _get_embedder()
+                mem_emb = get_mem_mb()
+                print(f"✅ EMBEDDER PREWARMED. Memory: {mem_emb:.2f} MB")
+            except Exception as e:
+                print(f"❌ EMBEDDER PREWARM FAILED: {e}")
+
+            if VOICE_ENABLED:
+                try:
+                    print("⏳ PREWARMING WHISPER (BACKGROUND)...")
                     from services.voice_transcription import _get_model
                     _get_model()
-                    print("\u2705 WHISPER MODEL PRELOADED")
+                    mem_wh = get_mem_mb()
+                    print(f"✅ WHISPER PREWARMED. Memory: {mem_wh:.2f} MB")
                 except Exception as exc:
-                    print(f"\u26a0\ufe0f  WHISPER PREWARM FAILED (voice will lazy-load on first request): {exc}")
+                    print(f"⚠️ WHISPER PREWARM FAILED (voice will lazy-load): {exc}")
 
-            t = threading.Thread(target=_prewarm_whisper, daemon=True, name="whisper-prewarm")
-            t.start()
+        t = threading.Thread(target=_prewarm_models, daemon=True, name="model-prewarm")
+        t.start()
     except Exception as e:
-        print(f"\u26a0\ufe0f  WHISPER PREWARM SKIPPED: {e}")
+        print(f"⚠️ MODEL PREWARM SKIPPED: {e}")
 
     # ── Ensure website knowledge base exists (non-blocking) ────────────────
     def _check_chroma_bg():
@@ -117,6 +143,14 @@ async def startup():
             for c in collections:
                 count = c.count()
                 print(f"   - Collection: '{c.name}' | count: {count}")
+                if c.name == "agicent-website" and count < 4000:
+                    print(f"⚠️ [STARTUP CHECK] Collection {c.name} has only {count} chunks (expected ~4020). Rebuilding from full dataset...")
+                    try:
+                        from ingest_website import ingest_website
+                        ingest_website()
+                        print(f"✅ [STARTUP CHECK] Rebuild complete. New count: {c.count()}")
+                    except Exception as rebuild_exc:
+                        print(f"❌ [STARTUP CHECK] Failed to rebuild: {rebuild_exc}")
 
         except Exception as e:
             print(f"❌ [STARTUP CHECK] ChromaDB Error: {e}")

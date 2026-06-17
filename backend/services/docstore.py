@@ -27,10 +27,9 @@ UPLOAD_DIR.mkdir(
     exist_ok=True
 )
 
-import os
-_bundled_meta = Path("bundled_tmp/documents.json")
-_META_FILE = _bundled_meta if _bundled_meta.exists() else Path("tmp/documents.json")
-print(f"🔧 [DIAGNOSTIC] Selected Docstore Meta File: {_META_FILE}")
+_META_FILE = (
+    Path("tmp/documents.json")
+)
 
 _META_FILE.parent.mkdir(
     parents=True,

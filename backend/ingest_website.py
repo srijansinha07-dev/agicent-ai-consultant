@@ -17,7 +17,7 @@ from models import (
 
 
 INPUT_FILE = (
-    "data/cleaned_pages_v2.json"
+    "data/cleaned_pages.json"
 )
 
 
@@ -106,80 +106,99 @@ def ingest_website():
     doc_id = "agicent_website"
     
 
-    print(
-        "\nRegistering "
-        "website..."
-    )
+    temp_doc_id = f"{doc_id}_temp"
+    
+    print("\n🔄 [REBUILD] Starting atomic rebuild...")
+    print(f"📦 [REBUILD] Creating temporary collection: {temp_doc_id}")
+
+    from services.vectorstore import delete_collection, _get_client, _safe_col_name
+    
+    # Ensure temp is clean
+    delete_collection(temp_doc_id)
+
+    print(f"📄 [REBUILD] Registering temporary doc metadata for {temp_doc_id}...")
 
     docstore.register(
-        doc_id=doc_id,
+        doc_id=temp_doc_id,
         user_id="website_bot",
-        name="Agicent Website",
+        name="Agicent Website (Building)",
         pdf_path="website://agicent",
         pages=len(pages),
     )
 
-    print(
-        "Chunking..."
-    )
+    print("⚙️ [REBUILD] Chunking pages...")
 
     chunks = chunk_pages(
         pages,
-        doc_id
+        doc_id  # Keep chunk's internal doc_id pointing to the real ID!
     )
 
-    print(
-        f"Created "
-        f"{len(chunks)} "
-        f"chunks"
-    )
+    print(f"✅ [REBUILD] Created {len(chunks)} chunks")
 
-    print(
-        "Saving pages..."
-    )
-
-    docstore.set_pages(
-        doc_id,
-        pages
-    )
-
-    print(
-        "Saving chunks..."
-    )
-
-    docstore.set_chunks(
-        doc_id,
-        chunks
-    )
-
-    print(
-        "Indexing into "
-        "ChromaDB..."
-    )
-
+    print("💾 [REBUILD] Indexing chunks into temporary ChromaDB collection...")
+    # We pass temp_doc_id to vectorstore so it creates agicent-website-temp
     index_chunks(
-        doc_id,
+        temp_doc_id,
         chunks
     )
 
-    print(
-        "Marking READY..."
-    )
+    print("\n🔍 [REBUILD] Validating newly built collection...")
+    client = _get_client()
+    temp_col = client.get_collection(_safe_col_name(temp_doc_id))
+    
+    count = temp_col.count()
+    print(f"📊 [VALIDATION] Chunk count: {count} (Expected: >= 4000)")
+    
+    res = temp_col.query(query_texts=["HASfit"], n_results=10)
+    has_hasfit = False
+    if res and res.get('documents') and res['documents'][0]:
+        for doc in res['documents'][0]:
+            if 'hasfit' in doc.lower():
+                has_hasfit = True
+                break
+                
+    print(f"🔎 [VALIDATION] HASfit case study exists: {has_hasfit}")
 
-    docstore.set_status(
-        doc_id,
-        IndexStatus.READY
-    )
-    print(
-        "Status after set:",
-        docstore.get_info(
-            doc_id
-        ).status
-    )
-
-    print(
-        "\nDone!"
-    )
+    if count >= 4000 and has_hasfit:
+        print("\n✅ [VALIDATION PASSED] Performing atomic swap...")
+        try:
+            real_col_name = _safe_col_name(doc_id)
+            temp_col_name = _safe_col_name(temp_doc_id)
+            old_col_name = f"{real_col_name}-old"
+            
+            # Delete any lingering old backup
+            delete_collection(f"{doc_id}_old")
+            
+            # Step 1: Rename current to old
+            try:
+                real_col = client.get_collection(real_col_name)
+                real_col.modify(name=old_col_name)
+                print(f"   -> Renamed active '{real_col_name}' to '{old_col_name}'")
+            except Exception as e:
+                print(f"   -> No existing '{real_col_name}' to rename ({e})")
+                
+            # Step 2: Rename temp to real (The atomic swap)
+            temp_col.modify(name=real_col_name)
+            print(f"   -> Renamed temp '{temp_col_name}' to active '{real_col_name}'")
+            
+            # Step 3: Cleanup old
+            delete_collection(f"{doc_id}_old")
+            print(f"   -> Cleaned up '{old_col_name}'")
+            
+            # Finally update docstore metadata pointers
+            print("💾 [REBUILD] Updating docstore metadata to active...")
+            docstore.set_pages(doc_id, pages)
+            docstore.set_chunks(doc_id, chunks)
+            docstore.set_status(doc_id, IndexStatus.READY)
+            
+            print(f"🎉 [REBUILD COMPLETE] Active collection '{real_col_name}' now has {count} chunks!")
+            
+        except Exception as e:
+            print(f"❌ [SWAP FAILED] Exception during swap: {e}")
+            print(f"⚠️ [REBUILD ABORTED] Original collection '{_safe_col_name(doc_id)}' remains untouched.")
+    else:
+        print(f"❌ [VALIDATION FAILED] Rebuild did not meet criteria. Count={count}, HASfit={has_hasfit}")
+        print(f"⚠️ [REBUILD ABORTED] Original collection '{_safe_col_name(doc_id)}' remains untouched.")
 
     print(
         f"\nDOC ID:"
