@@ -26,6 +26,8 @@ def _get_embedder():
     global _embedder
 
     if _embedder is None:
+        from config import log_memory
+        log_memory("Before SentenceTransformer embedder initialization")
         print("LOADING EMBEDDER...")
 
         from sentence_transformers import SentenceTransformer
@@ -36,6 +38,7 @@ def _get_embedder():
         )
 
         print("EMBEDDER LOADED")
+        log_memory("After SentenceTransformer embedder initialization")
 
     return _embedder
 

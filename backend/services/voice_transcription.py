@@ -201,7 +201,9 @@ def _get_model() -> object:
             return _model
 
         from faster_whisper import WhisperModel
+        from config import log_memory
 
+        log_memory("Before Whisper model initialization")
         _logger.info(
             "Loading Whisper model size=%s device=%s compute_type=%s",
             WHISPER_MODEL_SIZE,
@@ -214,6 +216,7 @@ def _get_model() -> object:
             device=WHISPER_DEVICE,
             compute_type=WHISPER_COMPUTE_TYPE,
         )
+        log_memory("After Whisper model initialization")
         _logger.info("Whisper model loaded.")
         return _model
 

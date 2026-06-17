@@ -73,42 +73,13 @@ async def startup():
     except Exception as e:
         print(f"\u274c POSTGRES DATABASE ERROR: {e}")
 
-    # D3: Pre-warm Whisper model in a background daemon thread so the first
-    # voice request doesn't cold-start and timeout. A plain daemon thread is
-    # used instead of ThreadPoolExecutor because:
-    #   - No executor lifecycle or atexit handler to manage
-    #   - Daemon flag ensures OS reclaims it on interpreter exit without blocking
-    #   - _get_model() uses a global singleton, so duplicate prewarm calls are safe
+    # ── Model Prewarming (DISABLED FOR DIAGNOSTICS) ────────────────
     try:
-        from config import VOICE_ENABLED
-        import threading
-
-        def _prewarm_models():
-            from config import log_memory
-            
-            log_memory("Startup base memory before models")
-
-            try:
-                print("⏳ PREWARMING EMBEDDER (BACKGROUND)...")
-                from services.vectorstore import _get_embedder
-                _get_embedder()
-                log_memory("After Embedder prewarm")
-            except Exception as e:
-                print(f"❌ EMBEDDER PREWARM FAILED: {e}")
-
-            if VOICE_ENABLED:
-                try:
-                    print("⏳ PREWARMING WHISPER (BACKGROUND)...")
-                    from services.voice_transcription import _get_model
-                    _get_model()
-                    log_memory("After Whisper prewarm")
-                except Exception as exc:
-                    print(f"⚠️ WHISPER PREWARM FAILED (voice will lazy-load): {exc}")
-
-        t = threading.Thread(target=_prewarm_models, daemon=True, name="model-prewarm")
-        t.start()
+        from config import log_memory
+        log_memory("Startup base memory before FastAPI binds")
+        print("⚠️ [STARTUP] ALL ML MODEL PREWARMING COMPLETELY DISABLED. Models will lazy-load.")
     except Exception as e:
-        print(f"⚠️ MODEL PREWARM SKIPPED: {e}")
+        print(f"⚠️ MODEL LOGGING FAILED: {e}")
 
     # ── Ensure website knowledge base exists (non-blocking) ────────────────
     def _check_chroma_bg():
