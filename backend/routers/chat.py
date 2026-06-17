@@ -141,6 +141,8 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
 
     # ── Run pipeline (feature-gated agentic router with safe fallback) ───
     if AGENTIC_ROUTER_ENABLED:
+        from config import log_memory
+        log_memory("Before agentic chat/retrieval")
         try:
             # Lazy import keeps startup memory low.
             from services.agentic_chat import run_agentic_chat
@@ -152,6 +154,7 @@ async def chat(req: ChatRequest,x_user_id: str = Header(...)):
                 pages_all=pages,
                 doc_info=info,
             )
+            log_memory("After agentic chat/retrieval")
         except Exception as e:
             print(f"[Chat Router] Agentic path failed, falling back to LangGraph: {e}")
             from services.langgraph_chat import run_chat_graph

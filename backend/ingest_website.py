@@ -77,6 +77,9 @@ def build_pages(
 
 def ingest_website():
 
+    from config import log_memory
+    log_memory("Rebuild entry point (ingest_website start)")
+
     print(
         "\nLoading website data..."
     )

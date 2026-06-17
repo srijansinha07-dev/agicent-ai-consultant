@@ -84,27 +84,15 @@ async def startup():
         import threading
 
         def _prewarm_models():
-            import os
+            from config import log_memory
             
-            def get_mem_mb():
-                try:
-                    with open('/proc/self/status') as f:
-                        for line in f:
-                            if line.startswith('VmRSS:'):
-                                return int(line.split()[1]) / 1024
-                except:
-                    pass
-                return 0.0
-
-            mem_start = get_mem_mb()
-            print(f"📊 [MEMORY] Startup base memory: {mem_start:.2f} MB")
+            log_memory("Startup base memory before models")
 
             try:
                 print("⏳ PREWARMING EMBEDDER (BACKGROUND)...")
                 from services.vectorstore import _get_embedder
                 _get_embedder()
-                mem_emb = get_mem_mb()
-                print(f"✅ EMBEDDER PREWARMED. Memory: {mem_emb:.2f} MB")
+                log_memory("After Embedder prewarm")
             except Exception as e:
                 print(f"❌ EMBEDDER PREWARM FAILED: {e}")
 
@@ -113,8 +101,7 @@ async def startup():
                     print("⏳ PREWARMING WHISPER (BACKGROUND)...")
                     from services.voice_transcription import _get_model
                     _get_model()
-                    mem_wh = get_mem_mb()
-                    print(f"✅ WHISPER PREWARMED. Memory: {mem_wh:.2f} MB")
+                    log_memory("After Whisper prewarm")
                 except Exception as exc:
                     print(f"⚠️ WHISPER PREWARM FAILED (voice will lazy-load): {exc}")
 
@@ -144,13 +131,13 @@ async def startup():
                 count = c.count()
                 print(f"   - Collection: '{c.name}' | count: {count}")
                 if c.name == "agicent-website" and count < 4000:
-                    print(f"⚠️ [STARTUP CHECK] Collection {c.name} has only {count} chunks (expected ~4020). Rebuilding from full dataset...")
-                    try:
-                        from ingest_website import ingest_website
-                        ingest_website()
-                        print(f"✅ [STARTUP CHECK] Rebuild complete. New count: {c.count()}")
-                    except Exception as rebuild_exc:
-                        print(f"❌ [STARTUP CHECK] Failed to rebuild: {rebuild_exc}")
+                    print(f"⚠️ [STARTUP CHECK] Collection {c.name} has only {count} chunks (expected ~4020). Rebuild logic disabled for memory profiling.")
+                    # try:
+                    #     from ingest_website import ingest_website
+                    #     ingest_website()
+                    #     print(f"✅ [STARTUP CHECK] Rebuild complete. New count: {c.count()}")
+                    # except Exception as rebuild_exc:
+                    #     print(f"❌ [STARTUP CHECK] Failed to rebuild: {rebuild_exc}")
 
         except Exception as e:
             print(f"❌ [STARTUP CHECK] ChromaDB Error: {e}")
