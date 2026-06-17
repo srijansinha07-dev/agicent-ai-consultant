@@ -11,18 +11,15 @@ load_dotenv()
 BASE_DIR      = Path(__file__).parent
 UPLOAD_DIR    = BASE_DIR / "uploads"
 
-# Auto-detect where the actual uploaded chroma database resides.
-# If a volume upload nested the folder, it might be in /app/chroma_db/chroma_db
-if os.path.exists("/app/chroma_db/chroma.sqlite3"):
-    CHROMA_DIR = Path("/app/chroma_db")
-elif os.path.exists("/app/chroma_db/chroma_db/chroma.sqlite3"):
-    CHROMA_DIR = Path("/app/chroma_db/chroma_db")
-elif os.path.exists(BASE_DIR / "chroma_db" / "chroma.sqlite3"):
-    CHROMA_DIR = BASE_DIR / "chroma_db"
-elif os.path.exists("/app/chroma_db"):
-    CHROMA_DIR = Path("/app/chroma_db")
+# For production, we ALWAYS use the bundled database because the persistent volume
+# (at /app/chroma_db) may hide it or contain an old/partial ingest (e.g. 2202 chunks).
+# Local still falls back to BASE_DIR / "chroma_db".
+if os.path.exists(BASE_DIR / "bundled_chroma_db" / "chroma.sqlite3"):
+    CHROMA_DIR = BASE_DIR / "bundled_chroma_db"
 else:
-    CHROMA_DIR = Path(os.getenv("CHROMA_PATH_DIR", BASE_DIR / "chroma_db"))
+    CHROMA_DIR = BASE_DIR / "chroma_db"
+
+print(f"🔧 [DIAGNOSTIC] Selected ChromaDB path: {CHROMA_DIR}")
 
 CONSULTATIONS_FILE = BASE_DIR / "data" / "consultations.json"
 
